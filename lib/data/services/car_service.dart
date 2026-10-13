@@ -24,11 +24,21 @@ class CarService {
     required String destinationCity,
     required String category,
     required double distance,
+    double? oneWayDistance,
+    double? pickupLat,
+    double? pickupLng,
+    double? dropLat,
+    double? dropLng,
     int? days,
     String? state,
+    int? packageHours,
+    int? includedKms,
+    String? petType,
+    bool? carryingPet,
+    Map<String, dynamic>? addons,
   }) async {
     try {
-      final response = await ApiService.post('/pricing-rules/calculate', {
+      final body = <String, dynamic>{
         'rideType': rideType,
         'sourceCity': sourceCity,
         'destinationCity': destinationCity,
@@ -36,7 +46,19 @@ class CarService {
         'distance': distance,
         'days': days ?? 1,
         'state': state ?? '',
-      });
+      };
+      if (oneWayDistance != null) body['oneWayDistance'] = oneWayDistance;
+      if (pickupLat != null) body['pickupLat'] = pickupLat;
+      if (pickupLng != null) body['pickupLng'] = pickupLng;
+      if (dropLat != null) body['dropLat'] = dropLat;
+      if (dropLng != null) body['dropLng'] = dropLng;
+      if (packageHours != null) body['packageHours'] = packageHours;
+      if (includedKms != null) body['includedKms'] = includedKms;
+      if (petType != null) body['petType'] = petType;
+      if (carryingPet != null) body['carryingPet'] = carryingPet;
+      if (addons != null) body['addons'] = addons;
+
+      final response = await ApiService.post('/pricing-rules/calculate', body);
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);

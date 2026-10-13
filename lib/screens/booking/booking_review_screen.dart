@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/booking_service.dart';
+import '../../data/services/payment_service.dart';
+import '../../data/services/auth_service.dart';
 import '../../data/models/booking.dart';
-import '../home/home_screen.dart';
+import '../../theme/app_theme.dart';
+import 'thank_you_screen.dart';
+import 'payment_pending_screen.dart';
 
 class BookingReviewScreen extends StatefulWidget {
   final String from;
@@ -13,6 +18,12 @@ class BookingReviewScreen extends StatefulWidget {
   final String carName;
   final String price;
   final String phoneNumber;
+  final String? petType;
+  final bool isRental;
+  final String? rentalPackage;
+  final bool isAirport;
+  final String? airportDirection;
+  final String? airportTerminal;
 
   const BookingReviewScreen({
     super.key,
@@ -24,6 +35,12 @@ class BookingReviewScreen extends StatefulWidget {
     required this.carName,
     required this.price,
     required this.phoneNumber,
+    this.petType,
+    this.isRental = false,
+    this.rentalPackage,
+    this.isAirport = false,
+    this.airportDirection,
+    this.airportTerminal,
   });
 
   @override
@@ -31,10 +48,10 @@ class BookingReviewScreen extends StatefulWidget {
 }
 
 class _BookingReviewScreenState extends State<BookingReviewScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _pickupLocationController = TextEditingController();
-  final TextEditingController _dropLocationController = TextEditingController();
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _pickupLocationController;
+  late TextEditingController _dropLocationController;
   late TextEditingController _phoneController;
 
   // Add-on States
@@ -42,12 +59,15 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   bool _includeLanguage = false;
   bool _includeLuggage = false;
   bool _includeNewCar = false;
+  bool _includePet = false;
+  int _petCount = 1;
 
   // Add-on Prices
   static const double priceExpressway = 293.0;
   static const double priceLanguage = 199.0;
   static const double priceLuggage = 149.0;
   static const double priceNewCar = 249.0;
+  static const double pricePerPet = 1000.0;
 
   // Coupon & Price State
   late double _basePrice;
@@ -59,13 +79,55 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   void initState() {
     super.initState();
     String displayPhone = widget.phoneNumber;
-    if (displayPhone.startsWith('91') && displayPhone.length > 10) {
+    if (displayPhone.startsWith('+91')) {
+      displayPhone = displayPhone.substring(3);
+    } else if (displayPhone.startsWith('91') && displayPhone.length > 10) {
       displayPhone = displayPhone.substring(2);
     }
     _phoneController = TextEditingController(text: displayPhone);
+    // Auto-populate pickup and drop locations from the booking search
+    _pickupLocationController = TextEditingController(text: widget.from);
+    _dropLocationController = TextEditingController(text: widget.to);
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
 
-    // Initialize price (parsing '₹ 3243' -> 3243.0)
-    _basePrice = double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+    final rawPrice =
+        double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+    if (widget.petType != null) {
+      _includePet = true;
+      _petCount = 1;
+      _basePrice = (rawPrice - pricePerPet).clamp(0.0, double.infinity);
+    } else {
+      _includePet = false;
+      _petCount = 1;
+      _basePrice = rawPrice;
+    }
+
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final name = await AuthService.getUserName();
+    final savedPhone = await AuthService.getUserPhone();
+    if (mounted) {
+      setState(() {
+        if (name != null &&
+            name.isNotEmpty &&
+            name != 'New User' &&
+            _nameController.text.isEmpty) {
+          _nameController.text = name;
+        }
+        if (_phoneController.text.isEmpty && savedPhone != null) {
+          String p = savedPhone;
+          if (p.startsWith('+91')) {
+            p = p.substring(3);
+          } else if (p.startsWith('91') && p.length > 10) {
+            p = p.substring(2);
+          }
+          _phoneController.text = p;
+        }
+      });
+    }
   }
 
   void _applyCoupon() {
@@ -81,12 +143,18 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         _discount = 0;
         _appliedCoupon = '';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid Coupon Code'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Invalid Coupon Code'),
+            backgroundColor: Colors.red,
+          ),
         );
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Coupon $code Applied Successfully!'), backgroundColor: Colors.green),
+        SnackBar(
+          content: Text('Coupon $code Applied Successfully!'),
+          backgroundColor: Colors.green,
+        ),
       );
     });
   }
@@ -97,10 +165,16 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     if (_includeLanguage) total += priceLanguage;
     if (_includeLuggage) total += priceLuggage;
     if (_includeNewCar) total += priceNewCar;
+    if (_includePet) total += (_petCount * pricePerPet);
     return total;
   }
 
   double get _finalPrice => (_basePrice + _addonsTotal) - _discount;
+
+  int _selectedPaymentPercent = 25;
+  double get _payableAmount => _selectedPaymentPercent == 0
+      ? 0.0
+      : (_finalPrice * (_selectedPaymentPercent / 100.0));
 
   bool _isCreatingBooking = false;
 
@@ -111,69 +185,201 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     _pickupLocationController.dispose();
     _dropLocationController.dispose();
     _phoneController.dispose();
+    _couponController.dispose();
     super.dispose();
   }
 
   Future<void> _handleConfirmBooking() async {
-    if (_nameController.text.isEmpty || _pickupLocationController.text.isEmpty || _dropLocationController.text.isEmpty) {
+    final String pickup = _pickupLocationController.text.trim().isNotEmpty
+        ? _pickupLocationController.text.trim()
+        : widget.from;
+    final String drop = _dropLocationController.text.trim().isNotEmpty
+        ? _dropLocationController.text.trim()
+        : widget.to;
+    final String name = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim()
+        : 'Customer';
+    final String phone = _phoneController.text.trim().isNotEmpty
+        ? _phoneController.text.trim()
+        : widget.phoneNumber;
+
+    if (pickup.isEmpty || drop.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
+        const SnackBar(
+          content: Text('Please verify pickup and drop locations'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
+    }
+
+    // Auto-save user name for future bookings
+    if (_nameController.text.trim().isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', _nameController.text.trim());
     }
 
     setState(() {
       _isCreatingBooking = true;
     });
 
+    final double advanceAmount = _payableAmount;
+    final double dueAmount = (_finalPrice - advanceAmount).clamp(0, double.infinity);
+
+    final String chosenCarCategory = _includePet
+        ? (widget.carName.contains('Pet')
+            ? '${widget.carName} (Pet count: $_petCount)'
+            : '${widget.carName} (with $_petCount pet${_petCount > 1 ? "s" : ""})')
+        : widget.carName;
+
     final booking = Booking(
-      customerName: _nameController.text,
-      customerMobile: widget.phoneNumber,
-      customerEmail: _emailController.text,
-      serviceType: widget.isOneWay ? 'Outstation oneway' : 'Outstation roundtrip',
-      state: 'Default', // Ideally should be fetched or passed
-      pickupAddress: _pickupLocationController.text,
-      dropAddress: _dropLocationController.text,
+      customerName: name,
+      customerMobile: phone,
+      customerEmail: _emailController.text.trim().isEmpty
+          ? null
+          : _emailController.text.trim(),
+      serviceType: widget.isAirport
+          ? 'Airport'
+          : (widget.isRental
+              ? 'Rental'
+              : (widget.isOneWay ? 'Outstation oneway' : 'Outstation roundtrip')),
+      airportDirection: widget.airportDirection,
+      airportTerminal: widget.airportTerminal,
+      rentalPackage: widget.rentalPackage,
+      state: 'Default',
+      pickupAddress: pickup,
+      dropAddress: drop,
       pickupDate: widget.date,
       pickupTime: widget.time,
-      vehicleCategory: widget.carName,
-      seater: 4, // Default or parse from carName
+      vehicleCategory: chosenCarCategory,
+      seater: 4,
       fare: _finalPrice,
-      advance: _finalPrice * 0.25,
-      dueFare: _finalPrice * 0.75,
+      advance: advanceAmount,
+      dueFare: dueAmount,
     );
 
-    final result = await BookingService.createBooking(booking);
+    try {
+      // 1. POST /api/bookings -> Booking created
+      final createdBooking = await BookingService.createBooking(booking);
 
-    if (mounted) {
+      if (!mounted) return;
+
+      if (createdBooking == null) {
+        setState(() {
+          _isCreatingBooking = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to create booking. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // If "Book at ₹0" was chosen:
+      if (advanceAmount <= 0) {
+        setState(() {
+          _isCreatingBooking = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ThankYouScreen(
+              booking: createdBooking,
+              paidAmount: 0,
+              paymentMethod: 'Pay on Trip',
+              phoneNumber: widget.phoneNumber,
+            ),
+          ),
+        );
+        return;
+      }
+
+      // 2. POST /api/payment/create-order -> Cashfree paymentSessionId
+      final orderRes = await PaymentService.createPaymentOrder(
+          createdBooking.bookingId ?? '');
+
+      if (!mounted) return;
+
+      if (!orderRes.success || orderRes.paymentSessionId == null) {
+        setState(() {
+          _isCreatingBooking = false;
+        });
+        // Failed to create payment order -> route to Payment Pending Screen so user can click PAY NOW
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentPendingScreen(
+              booking: createdBooking,
+              phoneNumber: widget.phoneNumber,
+              payableAdvance: advanceAmount,
+            ),
+          ),
+        );
+        return;
+      }
+
+      // 3. OPEN CASHFREE
+      await PaymentService.openCashfreeCheckout(
+        paymentSessionId: orderRes.paymentSessionId!,
+        env: orderRes.environment ?? 'sandbox',
+      );
+
+      // 4. Poll payment status from backend after Cashfree closes
+      final statusRes = await PaymentService.verifyPaymentWithPolling(
+        bookingId: createdBooking.bookingId ?? '',
+        maxAttempts: 5,
+        interval: const Duration(milliseconds: 1500),
+      );
+
+      // Clear any query params that might have been attached
+      PaymentService.clearUrlQueryParams();
+
+      if (!mounted) return;
+
       setState(() {
         _isCreatingBooking = false;
       });
 
-      if (result != null) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Booking Confirmed!'),
-            content: Text('Your booking ID is ${result.bookingId}. We have received your request.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => HomeScreen(phoneNumber: widget.phoneNumber)),
-                    (route) => false,
-                  );
-                },
-                child: const Text('Go to Home'),
-              ),
-            ],
+      if (statusRes.paymentStatus == 'SUCCESS') {
+        // SUCCESS -> Thank You Page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ThankYouScreen(
+              booking: statusRes.booking ?? createdBooking,
+              paidAmount: statusRes.paidAmount > 0
+                  ? statusRes.paidAmount
+                  : advanceAmount,
+              paymentMethod: statusRes.paymentMethod ?? 'Cashfree',
+              phoneNumber: widget.phoneNumber,
+            ),
           ),
         );
       } else {
+        // Cancel/Close or Pending -> Payment Pending Page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentPendingScreen(
+              booking: statusRes.booking ?? createdBooking,
+              phoneNumber: widget.phoneNumber,
+              payableAdvance: advanceAmount,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCreatingBooking = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to confirm booking. Please try again.')),
+          SnackBar(
+            content: Text('An unexpected error occurred: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -182,23 +388,40 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kBgMid,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: kCardBg,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded, color: kInk),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Review Your Booking',
-          style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.w600, fontSize: 18),
+          style: GoogleFonts.outfit(
+            color: kInk,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(Icons.account_circle, color: Colors.amber.shade400, size: 30),
-            onPressed: () {},
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kAmberSoft,
+                border: Border.all(color: kInputBorder),
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                color: kAmberDeep,
+                size: 22,
+              ),
+            ),
           ),
         ],
       ),
@@ -206,22 +429,22 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSummaryCard(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _buildCancellationPolicy(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   _buildContactForm(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
                   _buildCouponsSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
                   _buildPersonalizeSection(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 10),
                   _buildInclusionsExclusionsSection(),
-                  const SizedBox(height: 100), // Space for bottom bar
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -235,24 +458,64 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   Widget _buildSummaryCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.shade100),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        border: Border.all(color: kInputBorder),
+        boxShadow: kCardShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${widget.from} -> ${widget.to} (${widget.isOneWay ? "Oneway" : "Roundtrip"})',
-            style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: kAmberSoft,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: kInputBorder),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.route_rounded, size: 13, color: kAmberDeep),
+                const SizedBox(width: 5),
+                Text(
+                  'TRIP SUMMARY',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: kAmberDeep,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
+          Text(
+            widget.isAirport
+                ? '${widget.from} -> ${widget.to}'
+                : (widget.isRental
+                    ? '${widget.from} (${widget.rentalPackage ?? "Rental"})'
+                    : '${widget.from} -> ${widget.to} (${widget.isOneWay ? "Oneway" : "Roundtrip"})'),
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: kInk,
+            ),
+          ),
+          const SizedBox(height: 6),
           _buildSummaryItem('Car Type:', '${widget.carName} or Equivalent'),
           _buildSummaryItem('Pickup Date:', '${widget.date} ${widget.time}'),
-          _buildSummaryItem('Kms included:', '260 kms'),
+          if (widget.airportTerminal != null && widget.airportTerminal!.isNotEmpty)
+            _buildSummaryItem('Terminal:', widget.airportTerminal!),
+          _buildSummaryItem(
+            'Kms included:',
+            widget.isRental && widget.rentalPackage != null
+                ? widget.rentalPackage!
+                : '260 kms',
+          ),
         ],
       ),
     );
@@ -260,11 +523,26 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildSummaryItem(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(top: 4.0),
+      padding: const EdgeInsets.only(top: 3.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label ', style: GoogleFonts.outfit(color: Colors.grey, fontSize: 13)),
-          Text(value, style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text(
+            '$label ',
+            style: GoogleFonts.outfit(color: kInkSoft, fontSize: 12),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: kInk,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -272,20 +550,28 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildCancellationPolicy() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.orange.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.shade200),
+        color: kAmberSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kInputBorder),
       ),
       child: Row(
         children: [
-          Icon(Icons.access_time_filled, color: Colors.orange.shade700, size: 18),
-          const SizedBox(width: 12),
+          const Icon(
+            Icons.access_time_filled_rounded,
+            color: kAmberDeep,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Free cancellation till 1 hr of departure',
-              style: GoogleFonts.outfit(color: Colors.brown.shade700, fontSize: 13, fontWeight: FontWeight.w500),
+              style: GoogleFonts.outfit(
+                color: kInk,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -295,85 +581,124 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildContactForm() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: kInputBorder),
+        boxShadow: kCardShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Contact & Pickup Details',
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const Divider(height: 24),
-          _buildTextField('Full Name', _nameController),
-          const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 70,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+                padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
+                  color: kAmberSoft,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: kInputBorder),
                 ),
-                child: Row(
-                  children: [
-                    Text('+91', style: GoogleFonts.outfit(color: Colors.grey.shade600)),
-                    const Icon(Icons.keyboard_arrow_down, size: 14, color: Colors.grey),
-                  ],
+                child: const Icon(
+                  Icons.person_pin_circle_rounded,
+                  color: kAmberDeep,
+                  size: 15,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: TextField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'Mobile No.',
-                        ),
-                        keyboardType: TextInputType.phone,
-                      ),
-                    ),
-                    Positioned(
-                      top: -2,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        color: Colors.grey.shade100,
-                        child: Text('Mobile No.', style: GoogleFonts.outfit(fontSize: 10, color: Colors.amber)),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 7),
+              Text(
+                'Contact & Pickup Details',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: kInk,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildTextField('Email ID', _emailController),
-          const SizedBox(height: 16),
-          _buildTextField('Pickup Location', _pickupLocationController),
-          const SizedBox(height: 16),
-          _buildTextField('Drop Location', _dropLocationController),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          Divider(color: kInputBorder.withValues(alpha: 0.6)),
+          const SizedBox(height: 8),
+          _buildTextField('Full Name', _nameController),
+          const SizedBox(height: 8),
           Row(
             children: [
-              _buildFormButton(Icons.add, 'Alternate Email'),
-              const SizedBox(width: 12),
-              _buildFormButton(Icons.add, 'Add GST'),
+              Container(
+                width: 68,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: kInputBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kInputBorder),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '+91',
+                      style: GoogleFonts.outfit(
+                        color: kInk,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 15,
+                      color: kInkSoft,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kInputBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kInputBorder),
+                  ),
+                  child: TextField(
+                    controller: _phoneController,
+                    style: GoogleFonts.outfit(
+                      color: kInk,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Mobile No.',
+                      hintStyle: GoogleFonts.outfit(
+                        color: kInkSoft.withValues(alpha: 0.6),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildTextField('Email ID', _emailController),
+          const SizedBox(height: 8),
+          _buildTextField('Pickup Location', _pickupLocationController),
+          const SizedBox(height: 8),
+          _buildTextField('Drop Location', _dropLocationController),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _buildFormButton(Icons.add_rounded, 'Alternate Email'),
+              const SizedBox(width: 8),
+              _buildFormButton(Icons.add_rounded, 'Add GST'),
             ],
           ),
         ],
@@ -383,18 +708,19 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildTextField(String hint, TextEditingController controller) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        color: kInputBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kInputBorder),
       ),
       child: TextField(
         controller: controller,
+        style: GoogleFonts.outfit(color: kInk, fontWeight: FontWeight.w500, fontSize: 13),
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: GoogleFonts.outfit(color: Colors.grey),
+          hintStyle: GoogleFonts.outfit(color: kInkSoft.withValues(alpha: 0.6), fontSize: 12.5),
         ),
       ),
     );
@@ -402,14 +728,36 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildFormButton(IconData icon, String label) {
     return Expanded(
-      child: OutlinedButton.icon(
-        onPressed: () {},
-        icon: Icon(icon, size: 16, color: Colors.amber.shade400),
-        label: Text(label, style: GoogleFonts.outfit(color: Colors.amber.shade400, fontSize: 12)),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: Colors.amber.shade300),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kAmberSoft,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kInputBorder),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {},
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 15, color: kAmberDeep),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      color: kInk,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -419,49 +767,107 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Coupons & Offers', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: kAmberSoft,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: kInputBorder),
+              ),
+              child: const Icon(
+                Icons.local_offer_rounded,
+                color: kAmberDeep,
+                size: 14,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              'Coupons & Offers',
+              style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: kInk,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _appliedCoupon.isNotEmpty ? Colors.green.shade300 : Colors.grey.shade300),
+                  color: kInputBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        _appliedCoupon.isNotEmpty ? Colors.green : kInputBorder,
+                  ),
                 ),
                 child: TextField(
                   controller: _couponController,
+                  style: GoogleFonts.outfit(
+                    color: kInk,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
                   decoration: InputDecoration(
                     border: InputBorder.none,
-                    hintText: 'ENTER A COUPON (Try BROOMBOOM10)',
-                    hintStyle: GoogleFonts.outfit(color: Colors.grey, fontSize: 14),
+                    hintText: 'ENTER COUPON (Try BROOMBOOM10)',
+                    hintStyle: GoogleFonts.outfit(
+                      color: kInkSoft.withValues(alpha: 0.6),
+                      fontSize: 11.5,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _applyCoupon,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber.shade400,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _applyCoupon,
+              child: Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kAmber.withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Text('APPLY', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold)),
+                alignment: Alignment.center,
+                child: Text(
+                  'APPLY',
+                  style: GoogleFonts.outfit(
+                    color: kInk,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
               ),
             ),
           ],
         ),
         if (_appliedCoupon.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 4),
+            padding: const EdgeInsets.only(top: 6.0, left: 4),
             child: Text(
               'Applied: $_appliedCoupon (-₹${_discount.toStringAsFixed(0)})',
-              style: GoogleFonts.outfit(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+              style: GoogleFonts.outfit(
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+                fontSize: 11.5,
+              ),
             ),
           ),
       ],
@@ -470,25 +876,38 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildPersonalizeSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: kInputBorder),
+        boxShadow: kCardShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.stars, color: Colors.amber.shade400, size: 20),
-              const SizedBox(width: 8),
-              Text('Personalize Your Journey', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.amber.shade600)),
+              const Icon(Icons.stars_rounded, color: kAmberDeep, size: 18),
+              const SizedBox(width: 7),
+              Text(
+                'Personalize Your Journey',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: kInk,
+                ),
+              ),
             ],
           ),
+          const SizedBox(height: 2),
+          Text(
+            'Enhance your travel experience with our premium add-ons',
+            style: GoogleFonts.outfit(fontSize: 11, color: kInkSoft),
+          ),
+          const SizedBox(height: 8),
+          Divider(color: kInputBorder.withValues(alpha: 0.6)),
           const SizedBox(height: 4),
-          Text('Enhance your travel experience with our premium add-ons', style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade700)),
-          const Divider(height: 32),
           _buildAddonItem(
             '${widget.from} - ${widget.to} Expressway',
             '₹ 293',
@@ -503,132 +922,385 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             onChanged: (val) => setState(() => _includeLanguage = val!),
           ),
           _buildAddonItem(
-            'Cab with Luggage Carrier',
+            'Extra Luggage Carrier',
             '₹ 149',
             isSelected: _includeLuggage,
-            description: 'Get a car with a luggage carrier that will make your roadtrip extra comfortable. Our chauffeurs will make sure that your luggage is loaded, securely fastened and unloaded based on your convenience',
             onChanged: (val) => setState(() => _includeLuggage = val!),
           ),
           _buildAddonItem(
-            'New Car Promise - Model that is 2023 or newer',
+            'Guaranteed New Model Vehicle',
             '₹ 249',
             isSelected: _includeNewCar,
             onChanged: (val) => setState(() => _includeNewCar = val!),
           ),
+          _buildPetAddonItem(),
         ],
       ),
     );
   }
 
-  Widget _buildAddonItem(String title, String price, {bool isPopular = false, bool isSelected = false, String? description, ValueChanged<bool?>? onChanged}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+  Widget _buildPetAddonItem() {
+    final String title = widget.petType != null && widget.petType!.isNotEmpty
+        ? 'Carrying Pet (${widget.petType})'
+        : 'Carrying Pet';
+    final int totalPetPrice = (_petCount * pricePerPet).toInt();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.grey.shade50 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isSelected ? Colors.amber.shade100 : Colors.grey.shade200),
+        color: _includePet ? kAmberSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: _includePet ? Border.all(color: kInputBorder) : null,
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Checkbox(
-                value: isSelected,
-                onChanged: onChanged ?? (val) {},
-                activeColor: Colors.amber.shade400,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: _includePet,
+              onChanged: (val) {
+                setState(() {
+                  _includePet = val ?? false;
+                  if (_includePet && _petCount < 1) _petCount = 1;
+                });
+              },
+              activeColor: kAmberDeep,
+              checkColor: Colors.white,
+              side: const BorderSide(color: kInputBorder, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
               ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(title, style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
-                    if (isPopular) ...[
-                      const SizedBox(height: 4),
+                    const Icon(Icons.pets_rounded, size: 14, color: kAmberDeep),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kInk,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (widget.petType != null) ...[
+                      const SizedBox(width: 5),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(4)),
-                        child: Text('Most Popular', style: GoogleFonts.outfit(fontSize: 10, color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kAmberDeep,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'PET CAB',
+                          style: GoogleFonts.outfit(
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ],
                   ],
                 ),
-              ),
-              Text(price, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
-            ],
+                Text(
+                  _includePet
+                      ? '₹ $totalPetPrice (₹ 1,000/pet)'
+                      : '₹ 1,000 per pet',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: kAmberDeep,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          if (description != null && isSelected) ...[
-            const Padding(
-              padding: EdgeInsets.only(left: 48, top: 8),
-              child: Divider(),
+          if (_includePet)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: kInputBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      if (_petCount > 1) {
+                        setState(() => _petCount--);
+                      } else {
+                        setState(() => _includePet = false);
+                      }
+                    },
+                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      child: Icon(Icons.remove, size: 13, color: kInk),
+                    ),
+                  ),
+                  Text(
+                    '$_petCount',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: kInk,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      if (_petCount < 5) {
+                        setState(() => _petCount++);
+                      }
+                    },
+                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      child: Icon(Icons.add, size: 13, color: kInk),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(left: 48, top: 4),
-              child: Text(description, style: GoogleFonts.outfit(fontSize: 11, color: Colors.grey.shade700, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddonItem(
+    String title,
+    String price, {
+    required bool isSelected,
+    bool isPopular = false,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: isSelected ? kAmberSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: isSelected ? Border.all(color: kInputBorder) : null,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: isSelected,
+              onChanged: onChanged,
+              activeColor: kAmberDeep,
+              checkColor: Colors.white,
+              side: const BorderSide(color: kInputBorder, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-          ],
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kInk,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (isPopular) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: kAmberDeep,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'POPULAR',
+                          style: GoogleFonts.outfit(
+                            fontSize: 7.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Text(
+                  price,
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: kAmberDeep,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildInclusionsExclusionsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Inclusions/Exclusions', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('INCLUSIONS', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-              const SizedBox(height: 8),
-              _buildInclusionPoint(Icons.check_circle, 'Fuel Charges', true),
-              _buildInclusionPoint(Icons.check_circle, 'Driver Allowance', true),
-              if (!widget.isOneWay) ...[
-                _buildInclusionPoint(Icons.check_circle, 'Driver Driving Allowance', true),
-                _buildInclusionPoint(Icons.check_circle, 'Hour Charges', true),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kInputBorder),
+        boxShadow: kCardShadow(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFA5D6A7)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  size: 13,
+                  color: Color(0xFF2E7D32),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'INCLUSIONS',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF2E7D32),
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ],
-              const Divider(height: 24),
-              Text('EXCLUSIONS', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red)),
-              const SizedBox(height: 8),
-              _buildInclusionPoint(Icons.cancel, 'Toll / State Tax', false),
-              _buildInclusionPoint(Icons.cancel, 'GST (5%)', false),
-              _buildInclusionPoint(Icons.cancel, 'Parking Charges', false),
-              const Divider(height: 32),
-              Text(
-                'Terms and Conditions',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '• Night allowance is applicable from 10 PM to 6 AM.\n• Extra kms will be charged at ₹14.5/km.\n• Toll and state tax will be extra as per actuals.',
-                style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey.shade700, height: 1.5),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          _buildInclusionPoint(
+            Icons.check_circle_rounded,
+            'Base Fare & Fuel Charges',
+            true,
+          ),
+          _buildInclusionPoint(
+            Icons.check_circle_rounded,
+            'Driver Allowance',
+            true,
+          ),
+          const SizedBox(height: 8),
+          Divider(color: kInputBorder.withValues(alpha: 0.6)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFFFCDD2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.cancel_rounded,
+                  size: 13,
+                  color: Color(0xFFC62828),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  'EXCLUSIONS',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFC62828),
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildInclusionPoint(Icons.cancel_rounded, 'Toll / State Tax', false),
+          _buildInclusionPoint(Icons.cancel_rounded, 'GST (5%)', false),
+          _buildInclusionPoint(Icons.cancel_rounded, 'Parking Charges', false),
+          const SizedBox(height: 6),
+          Divider(color: kInputBorder.withValues(alpha: 0.6)),
+          const SizedBox(height: 6),
+          Text(
+            'Terms and Conditions',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: kInk,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '• Night allowance is applicable from 10 PM to 6 AM.\n• Extra kms will be charged at ₹14.5/km.\n• Toll and state tax will be extra as per actuals.',
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: kInkSoft,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildInclusionPoint(IconData icon, String text, bool isIncluded) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 4.0),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: isIncluded ? Colors.green : Colors.red),
-          const SizedBox(width: 8),
-          Text(text, style: GoogleFonts.outfit(fontSize: 13, color: Colors.black87)),
+          Icon(
+            icon,
+            size: 15,
+            color: isIncluded ? Colors.green : Colors.red.shade400,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.outfit(fontSize: 12, color: kInk),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -636,10 +1308,19 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   Widget _buildBottomPaymentBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2))],
+        color: kCardBg,
+        border: Border(
+          top: BorderSide(color: kInputBorder.withValues(alpha: 0.6)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: kAmber.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -649,8 +1330,19 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             children: [
               Row(
                 children: [
-                  Text('Total Fare ', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Icon(Icons.info_outline, size: 16, color: Colors.grey.shade400),
+                  Text(
+                    'Total Fare ',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: kInk,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 15,
+                    color: kInkSoft,
+                  ),
                 ],
               ),
               Column(
@@ -659,43 +1351,80 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                   if (_discount > 0)
                     Text(
                       '₹ ${_basePrice.toStringAsFixed(0)}',
-                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey, decoration: TextDecoration.lineThrough),
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: kInkSoft.withValues(alpha: 0.6),
+                        decoration: TextDecoration.lineThrough,
+                      ),
                     ),
-                  Text('₹ ${_finalPrice.toStringAsFixed(0)}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+                  Text(
+                    '₹ ${_finalPrice.toStringAsFixed(0)}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: kAmberDeep,
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Row(
             children: [
-              _buildPayOption('Book at ₹0'),
+              _buildPayOption('Book at ₹0', percent: 0),
+              const SizedBox(width: 4),
+              _buildPayOption('Pay 25%', percent: 25),
+              const SizedBox(width: 4),
+              _buildPayOption('Pay 100%', percent: 100),
               const SizedBox(width: 8),
-              _buildPayOption('Pay 25%', isSelected: true),
-              const SizedBox(width: 8),
-              _buildPayOption('Pay 100%'),
-              const SizedBox(width: 12),
               Expanded(
-                child: SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isCreatingBooking ? null : _handleConfirmBooking,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
+                child: GestureDetector(
+                  onTap: _isCreatingBooking ? null : _handleConfirmBooking,
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: kPrimaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: kButtonShadow(),
                     ),
-                    child: _isCreatingBooking
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Pay Now',
-                                  style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('₹ ${(_finalPrice * 0.25).toStringAsFixed(0)}',
-                                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 14)),
-                            ],
-                          ),
+                    child:
+                        _isCreatingBooking
+                            ? const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: kInk,
+                                  strokeWidth: 2.2,
+                                ),
+                              ),
+                            )
+                            : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _selectedPaymentPercent == 0
+                                      ? 'Book Now'
+                                      : 'Pay Now',
+                                  style: GoogleFonts.outfit(
+                                    color: kInk,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.5,
+                                  ),
+                                ),
+                                Text(
+                                  _selectedPaymentPercent == 0
+                                      ? 'Pay Later'
+                                      : '₹ ${_payableAmount.toStringAsFixed(0)}',
+                                  style: GoogleFonts.outfit(
+                                    color: kInk,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                   ),
                 ),
               ),
@@ -706,20 +1435,42 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     );
   }
 
-  Widget _buildPayOption(String label, {bool isSelected = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.amber.shade400 : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isSelected ? Colors.amber.shade400 : Colors.grey.shade300),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.outfit(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: isSelected ? Colors.white : Colors.black87,
+  Widget _buildPayOption(String label, {required int percent}) {
+    final bool isSelected = _selectedPaymentPercent == percent;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedPaymentPercent = percent;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          gradient:
+              isSelected
+                  ? const LinearGradient(colors: [Color(0xFFFFD54F), kAmber])
+                  : null,
+          color: isSelected ? null : kInputBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isSelected ? kAmberDeep : kInputBorder),
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: kAmber.withValues(alpha: 0.25),
+                      blurRadius: 5,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 10.5,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? kInk : kInkSoft,
+          ),
         ),
       ),
     );

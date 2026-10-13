@@ -7,6 +7,7 @@ class Booking {
   final String serviceType;
   final String? wayType;
   final String? airportDirection;
+  final String? airportTerminal;
   final String? rentalPackage;
   final String state;
   final String? pincode;
@@ -43,6 +44,7 @@ class Booking {
     required this.serviceType,
     this.wayType,
     this.airportDirection,
+    this.airportTerminal,
     this.rentalPackage,
     required this.state,
     this.pincode,
@@ -79,6 +81,7 @@ class Booking {
       'serviceType': serviceType,
       'wayType': wayType,
       'airportDirection': airportDirection,
+      'airportTerminal': airportTerminal,
       'rentalPackage': rentalPackage,
       'state': state,
       'pincode': pincode,
@@ -107,43 +110,56 @@ class Booking {
   }
 
   factory Booking.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0.0;
+    }
+
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      return int.tryParse(value.toString()) ?? 0;
+    }
+
     return Booking(
-      id: json['_id'],
-      bookingId: json['bookingId'],
-      customerName: json['customerName'] ?? '',
-      customerMobile: json['customerMobile'] ?? '',
-      customerEmail: json['customerEmail'],
-      serviceType: json['serviceType'] ?? '',
-      wayType: json['wayType'],
-      airportDirection: json['airportDirection'],
-      rentalPackage: json['rentalPackage'],
-      state: json['state'] ?? '',
-      pincode: json['pincode'],
-      pickupAddress: json['pickupAddress'] ?? '',
-      dropAddress: json['dropAddress'] ?? '',
-      distance: json['distance'],
-      pickupLat: json['pickupLat'],
-      pickupLng: json['pickupLng'],
-      dropLat: json['dropLat'],
-      dropLng: json['dropLng'],
-      pickupDate: json['pickupDate'] ?? '',
-      pickupTime: json['pickupTime'] ?? '',
-      returnDate: json['returnDate'],
-      returnTime: json['returnTime'],
-      vehicleCategory: json['vehicleCategory'] ?? '',
-      seater: json['seater'] ?? 0,
-      acType: json['acType'],
-      allocateOurPilot: json['allocateOurPilot'] ?? false,
-      fare: (json['fare'] ?? 0).toDouble(),
-      advance: (json['advance'] ?? 0).toDouble(),
-      dueFare: (json['dueFare'] ?? 0).toDouble(),
-      status: json['status'],
+      id: (json['_id'] ?? json['id'])?.toString(),
+      bookingId: json['bookingId']?.toString(),
+      customerName: json['customerName']?.toString() ?? '',
+      customerMobile: json['customerMobile']?.toString() ?? '',
+      customerEmail: json['customerEmail']?.toString(),
+      serviceType: json['serviceType']?.toString() ?? '',
+      wayType: json['wayType']?.toString(),
+      airportDirection: json['airportDirection']?.toString(),
+      airportTerminal: json['airportTerminal']?.toString(),
+      rentalPackage: json['rentalPackage']?.toString(),
+      state: json['state']?.toString() ?? '',
+      pincode: json['pincode']?.toString(),
+      pickupAddress: json['pickupAddress']?.toString() ?? '',
+      dropAddress: json['dropAddress']?.toString() ?? '',
+      distance: json['distance']?.toString(),
+      pickupLat: json['pickupLat']?.toString(),
+      pickupLng: json['pickupLng']?.toString(),
+      dropLat: json['dropLat']?.toString(),
+      dropLng: json['dropLng']?.toString(),
+      pickupDate: json['pickupDate']?.toString() ?? '',
+      pickupTime: json['pickupTime']?.toString() ?? '',
+      returnDate: json['returnDate']?.toString(),
+      returnTime: json['returnTime']?.toString(),
+      vehicleCategory: json['vehicleCategory']?.toString() ?? '',
+      seater: parseInt(json['seater']),
+      acType: json['acType']?.toString(),
+      allocateOurPilot: json['allocateOurPilot'] == true,
+      fare: parseDouble(json['fare']),
+      advance: parseDouble(json['advance']),
+      dueFare: parseDouble(json['dueFare']),
+      status: json['status']?.toString(),
       timeline: (json['timeline'] as List? ?? [])
           .map((item) => TimelineItem.fromJson(item))
           .toList(),
-      driverName: json['driverName'],
-      driverNumber: json['driverNumber'],
-      carNo: json['carNo'],
+      driverName: json['driverName']?.toString(),
+      driverNumber: json['driverNumber']?.toString(),
+      carNo: json['carNo']?.toString(),
     );
   }
 }

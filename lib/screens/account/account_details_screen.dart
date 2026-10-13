@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/settings_service.dart';
 import '../auth/login_screen.dart';
+import '../../theme/app_theme.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   final String phoneNumber;
@@ -59,19 +60,20 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kBgMid,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: kCardBg,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded, color: kInk),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Account',
+          'Account Details',
           style: GoogleFonts.outfit(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
+            color: kInk,
+            fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
@@ -87,7 +89,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             child: Image.asset(
               'assets/images/mandala_footer.png',
               fit: BoxFit.cover,
-              color: Colors.grey.withOpacity(0.05),
+              color: kAmber.withValues(alpha: 0.06),
               colorBlendMode: BlendMode.dstIn,
             ),
           ),
@@ -98,24 +100,26 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildInputField('NAME', _userName),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 _buildInputField('MOBILE', widget.phoneNumber),
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
                 _buildInputField('EMAIL', _email),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber.shade400,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
+                const SizedBox(height: 28),
+                GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    width: double.infinity,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: kPrimaryGradient,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: kButtonShadow(),
                     ),
-                    child: Text(
-                      'Update',
-                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+                    child: Center(
+                      child: Text(
+                        'Update Details',
+                        style: GoogleFonts.outfit(color: kInk, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
                     ),
                   ),
                 ),
@@ -123,18 +127,19 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextButton(
+                    TextButton.icon(
                       onPressed: _handleLogout,
-                      child: Text(
+                      icon: const Icon(Icons.logout_rounded, color: kAmberDeep, size: 18),
+                      label: Text(
                         'Sign Out',
-                        style: GoogleFonts.outfit(color: Colors.amber.shade400, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(color: kAmberDeep, fontWeight: FontWeight.bold),
                       ),
                     ),
                     TextButton(
                       onPressed: () {},
                       child: Text(
                         'Delete Account',
-                        style: GoogleFonts.outfit(color: Colors.grey),
+                        style: GoogleFonts.outfit(color: kInkSoft),
                       ),
                     ),
                   ],
@@ -148,29 +153,33 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
             left: 0,
             right: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              color: Colors.amber.shade400,
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: kAmberSoft,
+                border: Border(top: BorderSide(color: kInputBorder)),
+              ),
               child: Column(
                 children: [
                   Text(
                     'For any feedback or concerns related to your booking, please',
-                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 11),
+                    style: GoogleFonts.outfit(color: kInkSoft, fontSize: 11),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         'mail us at $_supportEmail, or call us at ',
-                        style: GoogleFonts.outfit(color: Colors.white, fontSize: 11),
+                        style: GoogleFonts.outfit(color: kInk, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
-                      const Icon(Icons.call, color: Colors.white, size: 12),
+                      const Icon(Icons.call_rounded, color: kAmberDeep, size: 13),
                       Text(
                         ' $_supportPhone.',
                         style: GoogleFonts.outfit(
-                          color: Colors.white,
+                          color: kAmberDeep,
                           fontSize: 11,
+                          fontWeight: FontWeight.bold,
                           decoration: TextDecoration.underline,
                         ),
                       ),
@@ -186,25 +195,40 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   }
 
   Widget _buildInputField(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: TextEditingController(text: value),
-          decoration: InputDecoration(
-            hintText: value,
-            hintStyle: GoogleFonts.outfit(color: Colors.grey.shade400),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade300)),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.amber.shade400)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: kInputBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kInputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: kAmberDeep,
+              letterSpacing: 1.0,
+            ),
           ),
-          style: GoogleFonts.outfit(color: Colors.black, fontSize: 16),
-        ),
-      ],
+          const SizedBox(height: 4),
+          TextField(
+            controller: TextEditingController(text: value),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              hintText: value,
+              hintStyle: GoogleFonts.outfit(color: kInkSoft.withValues(alpha: 0.6)),
+              border: InputBorder.none,
+            ),
+            style: GoogleFonts.outfit(color: kInk, fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
     );
   }
 }
+

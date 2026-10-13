@@ -29,10 +29,45 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>txigo_user_app</title>
+  <title>broomboomcabs_user_app</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Cashfree Checkout SDK v3 -->
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+  <script>
+    window.cashfreeCheckout = function(paymentSessionId, env) {
+      return new Promise(function(resolve) {
+        try {
+          var mode = (env === 'production') ? 'production' : 'sandbox';
+          var cashfree = Cashfree({ mode: mode });
+          cashfree.checkout({
+            paymentSessionId: paymentSessionId,
+            redirectTarget: "_modal"
+          }).then(function(result) {
+            console.log("[Cashfree JS] Checkout resolved:", result);
+            resolve(JSON.stringify(result || {}));
+          }).catch(function(err) {
+            console.error("[Cashfree JS] Checkout error:", err);
+            resolve(JSON.stringify({ error: err ? String(err) : "Unknown error" }));
+          });
+        } catch (e) {
+          console.error("[Cashfree JS] Exception:", e);
+          resolve(JSON.stringify({ error: e ? String(e) : "SDK exception" }));
+        }
+      });
+    };
+
+    window.clearUrlQueryParams = function() {
+      try {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (e) {
+        console.warn("Could not clear query params:", e);
+      }
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

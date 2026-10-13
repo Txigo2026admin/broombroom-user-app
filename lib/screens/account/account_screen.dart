@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'account_details_screen.dart';
 import 'bookings_screen.dart';
 import 'content_hub_screen.dart';
+import '../../theme/app_theme.dart';
 
 class AccountScreen extends StatelessWidget {
   final String phoneNumber;
@@ -12,19 +13,20 @@ class AccountScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kBgMid,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: kCardBg,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_rounded, color: kInk),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Account',
           style: GoogleFonts.outfit(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
+            color: kInk,
+            fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
@@ -40,7 +42,7 @@ class AccountScreen extends StatelessWidget {
             child: Image.asset(
               'assets/images/mandala_footer.png',
               fit: BoxFit.cover,
-              color: Colors.grey.withOpacity(0.1),
+              color: kAmber.withValues(alpha: 0.08),
               colorBlendMode: BlendMode.dstIn,
             ),
           ),
@@ -58,37 +60,60 @@ class AccountScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.amber.shade100, width: 1),
+                        border: Border.all(color: kInputBorder, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kAmber.withValues(alpha: 0.25),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Colors.amber.shade50,
-                        child: Icon(Icons.person, size: 50, color: Colors.amber.shade400),
+                      child: const CircleAvatar(
+                        radius: 44,
+                        backgroundColor: kAmberSoft,
+                        child: Icon(
+                          Icons.person_rounded,
+                          size: 52,
+                          color: kAmberDeep,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 40),
                   // Menu Items
-                  _buildMenuItem(context, 'My bookings'),
-                  const SizedBox(height: 16),
-                  _buildMenuItem(context, 'Account details'),
-                  const SizedBox(height: 16),
-                  _buildMenuItem(context, 'Road trips for you'),
+                  _buildMenuItem(
+                    context,
+                    'My bookings',
+                    Icons.calendar_today_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildMenuItem(
+                    context,
+                    'Account details',
+                    Icons.manage_accounts_rounded,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildMenuItem(
+                    context,
+                    'Road trips for you',
+                    Icons.explore_rounded,
+                  ),
                   const Spacer(),
                   // Social Media Icons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildSocialIcon(Icons.flutter_dash), // Mock Twitter
-                      const SizedBox(width: 20),
-                      _buildSocialIcon(Icons.facebook),
-                      const SizedBox(width: 20),
-                      _buildSocialIcon(Icons.camera_alt_outlined), // Mock Instagram
-                      const SizedBox(width: 20),
-                      _buildSocialIcon(Icons.play_circle_outline), // Mock YouTube
+                      _buildSocialIcon(Icons.flutter_dash),
+                      const SizedBox(width: 18),
+                      _buildSocialIcon(Icons.facebook_rounded),
+                      const SizedBox(width: 18),
+                      _buildSocialIcon(Icons.camera_alt_rounded),
+                      const SizedBox(width: 18),
+                      _buildSocialIcon(Icons.play_circle_fill_rounded),
                     ],
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 36),
                 ],
               ),
             ),
@@ -98,29 +123,38 @@ class AccountScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuItem(BuildContext context, String title) {
+  Widget _buildMenuItem(BuildContext context, String title, IconData icon) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kInputBorder.withValues(alpha: 0.8)),
+        boxShadow: kCardShadow(opacity: 0.12),
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: kAmberSoft,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kInputBorder),
+          ),
+          child: Icon(icon, color: kAmberDeep, size: 20),
+        ),
         title: Text(
           title,
           style: GoogleFonts.outfit(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: kInk,
           ),
         ),
-        trailing: const Icon(Icons.arrow_forward, size: 18, color: Colors.black54),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 16,
+          color: kAmberDeep,
+        ),
         onTap: () {
           Widget nextScreen;
           if (title == 'My bookings') {
@@ -142,12 +176,20 @@ class AccountScreen extends StatelessWidget {
 
   Widget _buildSocialIcon(IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade300),
+        color: kCardBg,
+        border: Border.all(color: kInputBorder),
+        boxShadow: [
+          BoxShadow(
+            color: kAmber.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Icon(icon, color: Colors.black87, size: 24),
+      child: Icon(icon, color: kAmberDeep, size: 22),
     );
   }
 }
