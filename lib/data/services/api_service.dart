@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Live production backend URL (where admin prices are updated)
-  static const String _productionApiUrl = 'http://localhost:5004/api';
+  static const String _productionApiUrl =
+      'https://broombroom-user-backend-kohl.vercel.app/api';
 
   // Local backend URLs (port 5004)
   static const String _localApiUrlWeb = 'http://localhost:5004/api';
