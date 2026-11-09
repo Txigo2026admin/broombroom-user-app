@@ -10,12 +10,28 @@ class BookingCard extends StatefulWidget {
   final bool isOneWay;
   final Function(bool) onToggle;
   final String phoneNumber;
+  final String? initialFrom;
+  final String? initialTo;
+  final double? initialFromLat;
+  final double? initialFromLng;
+  final double? initialToLat;
+  final double? initialToLng;
+  final String? initialStartDate;
+  final String? initialStartTime;
 
   const BookingCard({
     super.key,
     required this.isOneWay,
     required this.onToggle,
     required this.phoneNumber,
+    this.initialFrom,
+    this.initialTo,
+    this.initialFromLat,
+    this.initialFromLng,
+    this.initialToLat,
+    this.initialToLng,
+    this.initialStartDate,
+    this.initialStartTime,
   });
 
   @override
@@ -33,12 +49,91 @@ class _BookingCardState extends State<BookingCard> {
   double? _toLng;
   String? _fromFullAddress;
   String? _toFullAddress;
-  String startDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
-  String startTime = '07:00 AM';
-  String endDate = DateFormat(
-    'dd-MM-yyyy',
-  ).format(DateTime.now().add(const Duration(days: 1)));
-  String endSubtitle = DateFormat('EEEE').format(DateTime.now().add(const Duration(days: 1)));
+  late String startDate;
+  late String startTime;
+  late String endDate;
+  late String endTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final startDt = _getInitialStartTime();
+    final endDt = startDt.add(const Duration(hours: 3));
+
+    startDate = widget.initialStartDate ?? DateFormat('dd-MM-yyyy').format(startDt);
+    startTime = widget.initialStartTime ?? DateFormat('hh:mm a').format(startDt);
+
+    endDate = DateFormat('dd-MM-yyyy').format(endDt);
+    endTime = DateFormat('hh:mm a').format(endDt);
+
+    if (widget.initialFrom != null && widget.initialFrom!.isNotEmpty) {
+      _fromController.text = widget.initialFrom!;
+      _fromFullAddress = widget.initialFrom;
+      _fromLat = widget.initialFromLat;
+      _fromLng = widget.initialFromLng;
+    }
+    if (widget.initialTo != null && widget.initialTo!.isNotEmpty) {
+      _toController.text = widget.initialTo!;
+      _toFullAddress = widget.initialTo;
+      _toLat = widget.initialToLat;
+      _toLng = widget.initialToLng;
+    }
+  }
+
+  @override
+  void didUpdateWidget(BookingCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFrom != null && widget.initialFrom != oldWidget.initialFrom) {
+      _fromController.text = widget.initialFrom!;
+      _fromFullAddress = widget.initialFrom;
+      _fromLat = widget.initialFromLat;
+      _fromLng = widget.initialFromLng;
+    }
+    if (widget.initialTo != null && widget.initialTo != oldWidget.initialTo) {
+      _toController.text = widget.initialTo!;
+      _toFullAddress = widget.initialTo;
+      _toLat = widget.initialToLat;
+      _toLng = widget.initialToLng;
+    }
+    if (widget.initialStartDate != null && widget.initialStartDate != oldWidget.initialStartDate) {
+      startDate = widget.initialStartDate!;
+    }
+    if (widget.initialStartTime != null && widget.initialStartTime != oldWidget.initialStartTime) {
+      startTime = widget.initialStartTime!;
+    }
+  }
+
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    int minute = now.minute;
+    int roundedMinute = ((minute + 14) ~/ 15) * 15;
+    if (roundedMinute == 60) {
+      return DateTime(now.year, now.month, now.day, now.hour + 1, 0);
+    }
+    return DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+  }
+
+  static DateTime _parseDateTime(String dateStr, String timeStr) {
+    try {
+      final dateParts = dateStr.split('-');
+      final day = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final year = int.parse(dateParts[2]);
+
+      final timeParts = timeStr.trim().split(' ');
+      final hm = timeParts[0].split(':');
+      int hour = int.parse(hm[0]);
+      final minute = int.parse(hm[1]);
+      final period = timeParts.length > 1 ? timeParts[1].toUpperCase() : 'AM';
+
+      if (period == 'PM' && hour < 12) hour += 12;
+      if (period == 'AM' && hour == 12) hour = 0;
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
 
   @override
   void dispose() {
@@ -247,6 +342,8 @@ class _BookingCardState extends State<BookingCard> {
               toLng: _toLng,
               date: startDate,
               time: startTime,
+              returnDate: !widget.isOneWay ? endDate : null,
+              returnTime: !widget.isOneWay ? endTime : null,
               isOneWay: widget.isOneWay,
               phoneNumber: widget.phoneNumber,
             ),
@@ -422,6 +519,15 @@ class _BookingCardState extends State<BookingCard> {
                   setState(() {
                     startDate = res['displayDate'] ?? res['date'];
                     startTime = res['time'];
+
+                    final currentStart = _parseDateTime(startDate, startTime);
+                    final currentEnd = _parseDateTime(endDate, endTime);
+                    final minEnd = currentStart.add(const Duration(hours: 3));
+
+                    if (currentEnd.isBefore(minEnd)) {
+                      endDate = DateFormat('dd-MM-yyyy').format(minEnd);
+                      endTime = DateFormat('hh:mm a').format(minEnd);
+                    }
                   });
                 }
               },
@@ -434,15 +540,40 @@ class _BookingCardState extends State<BookingCard> {
                 context,
                 'TRIP END',
                 endDate,
-                endSubtitle,
+                endTime,
                 (res) {
                   if (res != null) {
-                    setState(() {
-                      endDate = res['displayDate'] ?? res['date'];
-                      endSubtitle = res['dayName'] ?? res['time'];
-                    });
+                    final pickedDate = res['displayDate'] ?? res['date'];
+                    final pickedTime = res['time'];
+
+                    final currentStart = _parseDateTime(startDate, startTime);
+                    final pickedEnd = _parseDateTime(pickedDate, pickedTime);
+                    final minEnd = currentStart.add(const Duration(hours: 3));
+
+                    if (pickedEnd.isBefore(minEnd)) {
+                      setState(() {
+                        endDate = DateFormat('dd-MM-yyyy').format(minEnd);
+                        endTime = DateFormat('hh:mm a').format(minEnd);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Trip end time must be at least 3 hours after trip start time ($startTime). Set to $endTime.',
+                            style: GoogleFonts.outfit(),
+                          ),
+                          backgroundColor: Colors.black87,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    } else {
+                      setState(() {
+                        endDate = pickedDate;
+                        endTime = pickedTime;
+                      });
+                    }
                   }
                 },
+                minDateTime: _parseDateTime(startDate, startTime).add(const Duration(hours: 3)),
               ),
             ),
           ],
@@ -457,8 +588,9 @@ class _BookingCardState extends State<BookingCard> {
     String label,
     String date,
     String subText,
-    Function(Map<String, dynamic>?) onResult,
-  ) {
+    Function(Map<String, dynamic>?) onResult, {
+    DateTime? minDateTime,
+  }) {
     return GestureDetector(
       onTap: () async {
         final result = await showDialog<Map<String, dynamic>>(
@@ -467,7 +599,8 @@ class _BookingCardState extends State<BookingCard> {
               (context) => DateTimePickerDialog(
                 label: label,
                 initialDate: date,
-                initialTime: subText.contains('M') ? subText : '07:00 AM',
+                initialTime: subText,
+                minDateTime: minDateTime,
               ),
         );
         onResult(result);

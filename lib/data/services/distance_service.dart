@@ -71,13 +71,58 @@ class DistanceService {
         final data = jsonDecode(response.body);
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final distMeters = (data['routes'][0]['distance'] as num).toDouble();
-          return ((distMeters / 1000.0) * 10).round() / 10.0;
+          final km = ((distMeters / 1000.0) * 10).round() / 10.0;
+          if (km > 0) return km;
         }
       }
-      return 0.0;
     } catch (e) {
       print('Error calculating OSRM distance: $e');
-      return 0.0;
     }
+
+    // 3. Direct Google Routes API (New) fallback if OpenStreetMap failed
+    try {
+      double? lat1 = pickupLat;
+      double? lon1 = pickupLng;
+      double? lat2 = dropLat;
+      double? lon2 = dropLng;
+
+      if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
+        final googleResponse = await http.post(
+          Uri.parse('https://routes.googleapis.com/directions/v2:computeRoutes'),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': 'AIzaSyBdAaSarc60pYSXzYE9o6OTVnF7PMGFsHs',
+            'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+          },
+          body: jsonEncode({
+            'origin': {
+              'location': {
+                'latLng': {'latitude': lat1, 'longitude': lon1}
+              }
+            },
+            'destination': {
+              'location': {
+                'latLng': {'latitude': lat2, 'longitude': lon2}
+              }
+            },
+            'travelMode': 'DRIVE',
+            'routingPreference': 'TRAFFIC_UNAWARE'
+          }),
+        );
+
+        if (googleResponse.statusCode == 200) {
+          final gData = jsonDecode(googleResponse.body);
+          if (gData['routes'] != null && (gData['routes'] as List).isNotEmpty) {
+            final distMeters = (gData['routes'][0]['distanceMeters'] as num).toDouble();
+            final km = ((distMeters / 1000.0) * 10).round() / 10.0;
+            if (km > 0) return km;
+          }
+        }
+      }
+    } catch (gErr) {
+      print('Google Routes fallback notice: $gErr');
+    }
+
+    return 0.0;
   }
 }

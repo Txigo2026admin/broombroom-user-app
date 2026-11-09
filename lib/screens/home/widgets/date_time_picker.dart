@@ -7,12 +7,14 @@ class DateTimePickerDialog extends StatefulWidget {
   final String label;
   final String initialDate;
   final String initialTime;
+  final DateTime? minDateTime;
 
   const DateTimePickerDialog({
     super.key,
     required this.label,
     this.initialDate = '',
-    this.initialTime = '07:00 AM',
+    this.initialTime = '',
+    this.minDateTime,
   });
 
   @override
@@ -69,27 +71,65 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
       }
     }
 
-    // Match initial time
+    // Match initial time (or default to minDateTime or current time)
     try {
       String time = widget.initialTime.trim();
+      if (time.isEmpty) {
+        throw Exception();
+      }
       if (time.contains(':') && time.contains(' ')) {
         String h = int.parse(time.split(':')[0].trim()).toString();
         String m = time.split(':')[1].split(' ')[0].trim();
         String p = time.split(' ')[1].trim().toUpperCase();
 
         selectedHourIndex = hours.indexOf(h);
-        selectedMinuteIndex = minutes.indexOf(m);
+        if (selectedHourIndex == -1) {
+          int hVal = int.tryParse(h) ?? 1;
+          if (hVal > 12) hVal -= 12;
+          if (hVal == 0) hVal = 12;
+          selectedHourIndex = hours.indexOf(hVal.toString());
+        }
+
+        int mVal = int.tryParse(m) ?? 0;
+        int closestMinIdx = 0;
+        int minDiff = 999;
+        for (int i = 0; i < minutes.length; i++) {
+          int diff = (int.parse(minutes[i]) - mVal).abs();
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestMinIdx = i;
+          }
+        }
+        selectedMinuteIndex = closestMinIdx;
         selectedPeriodIndex = periods.indexOf(p);
       } else {
         throw Exception();
       }
     } catch (_) {
-      selectedHourIndex = 6; // 7
-      selectedMinuteIndex = 0; // 00
-      selectedPeriodIndex = 0; // AM
+      final fallback = widget.minDateTime ?? DateTime.now();
+      int h = fallback.hour;
+      String p = h >= 12 ? 'PM' : 'AM';
+      if (h > 12) h -= 12;
+      if (h == 0) h = 12;
+      selectedHourIndex = hours.indexOf(h.toString());
+      if (selectedHourIndex == -1) selectedHourIndex = 0;
+      selectedPeriodIndex = periods.indexOf(p);
+      if (selectedPeriodIndex == -1) selectedPeriodIndex = 0;
+
+      int mVal = fallback.minute;
+      int closestMinIdx = 0;
+      int minDiff = 999;
+      for (int i = 0; i < minutes.length; i++) {
+        int diff = (int.parse(minutes[i]) - mVal).abs();
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestMinIdx = i;
+        }
+      }
+      selectedMinuteIndex = closestMinIdx;
     }
 
-    if (selectedHourIndex == -1) selectedHourIndex = 6;
+    if (selectedHourIndex == -1) selectedHourIndex = 0;
     if (selectedMinuteIndex == -1) selectedMinuteIndex = 0;
     if (selectedPeriodIndex == -1) selectedPeriodIndex = 0;
   }
@@ -97,11 +137,17 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
   void _generateDates() {
     rawDates = [];
     dates = [];
-    DateTime now = DateTime.now();
+    final baseDate = widget.minDateTime ?? DateTime.now();
+    DateTime start = DateTime(baseDate.year, baseDate.month, baseDate.day);
+    DateTime today = DateTime.now();
+    DateTime todayStart = DateTime(today.year, today.month, today.day);
+
     for (int i = 0; i < 90; i++) {
-      DateTime d = now.add(Duration(days: i));
+      DateTime d = start.add(Duration(days: i));
       rawDates.add(d);
-      if (i == 0) {
+      if (d.year == todayStart.year &&
+          d.month == todayStart.month &&
+          d.day == todayStart.day) {
         dates.add('Today');
       } else {
         dates.add(DateFormat('EEE MMM dd').format(d));
@@ -281,13 +327,47 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
             GestureDetector(
               onTap: () {
                 DateTime selectedDate = rawDates[selectedDateIndex];
+                int h = int.parse(hours[selectedHourIndex]);
+                int m = int.parse(minutes[selectedMinuteIndex]);
+                String p = periods[selectedPeriodIndex];
+                if (p == 'PM' && h < 12) h += 12;
+                if (p == 'AM' && h == 12) h = 0;
+                DateTime fullDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, h, m);
+
+                String finalTime = formattedTime;
+                DateTime finalDate = selectedDate;
+
+                if (widget.minDateTime != null && fullDt.isBefore(widget.minDateTime!)) {
+                  fullDt = widget.minDateTime!;
+                  finalDate = DateTime(fullDt.year, fullDt.month, fullDt.day);
+                  int clampedH = fullDt.hour;
+                  String clampedP = clampedH >= 12 ? 'PM' : 'AM';
+                  if (clampedH > 12) clampedH -= 12;
+                  if (clampedH == 0) clampedH = 12;
+                  String clampedHourStr = clampedH.toString().padLeft(2, '0');
+
+                  int clampedMVal = fullDt.minute;
+                  int clampedMinIdx = 0;
+                  int diffMin = 999;
+                  for (int i = 0; i < minutes.length; i++) {
+                    int diff = (int.parse(minutes[i]) - clampedMVal).abs();
+                    if (diff < diffMin) {
+                      diffMin = diff;
+                      clampedMinIdx = i;
+                    }
+                  }
+                  String clampedMinStr = minutes[clampedMinIdx];
+                  finalTime = '$clampedHourStr:$clampedMinStr $clampedP';
+                }
+
                 Navigator.pop(context, {
-                  'date': DateFormat('dd-MM-yyyy').format(selectedDate),
-                  'displayDate': DateFormat('dd-MM-yyyy').format(selectedDate),
-                  'summaryDate': formattedSummaryDate,
-                  'dayName': DateFormat('EEEE').format(selectedDate),
-                  'time': formattedTime,
-                  'rawDate': selectedDate,
+                  'date': DateFormat('dd-MM-yyyy').format(finalDate),
+                  'displayDate': DateFormat('dd-MM-yyyy').format(finalDate),
+                  'summaryDate': DateFormat('EEE, dd MMM').format(finalDate),
+                  'dayName': DateFormat('EEEE').format(finalDate),
+                  'time': finalTime,
+                  'rawDate': finalDate,
+                  'fullDateTime': fullDt,
                 });
               },
               child: Container(

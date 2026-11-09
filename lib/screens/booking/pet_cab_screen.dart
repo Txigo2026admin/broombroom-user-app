@@ -59,10 +59,55 @@ class _PetCabScreenState extends State<PetCabScreen> {
 
   // Pet & Dates
   String _selectedPet = 'Dog';
-  String startDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
-  String startTime = '07:00 AM';
-  String endDate = DateFormat('dd-MM-yyyy').format(DateTime.now().add(const Duration(days: 1)));
-  String endSubtitle = DateFormat('EEEE').format(DateTime.now().add(const Duration(days: 1)));
+  late String startDate;
+  late String startTime;
+  late String endDate;
+  late String endTime;
+
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    int minute = now.minute;
+    int roundedMinute = ((minute + 14) ~/ 15) * 15;
+    if (roundedMinute == 60) {
+      return DateTime(now.year, now.month, now.day, now.hour + 1, 0);
+    }
+    return DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+  }
+
+  static DateTime _parseDateTime(String dateStr, String timeStr) {
+    try {
+      final dateParts = dateStr.split('-');
+      final day = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final year = int.parse(dateParts[2]);
+
+      final timeParts = timeStr.trim().split(' ');
+      final hm = timeParts[0].split(':');
+      int hour = int.parse(hm[0]);
+      final minute = int.parse(hm[1]);
+      final period = timeParts.length > 1 ? timeParts[1].toUpperCase() : 'AM';
+
+      if (period == 'PM' && hour < 12) hour += 12;
+      if (period == 'AM' && hour == 12) hour = 0;
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final startDt = _getInitialStartTime();
+    final endDt = startDt.add(const Duration(hours: 3));
+
+    startDate = DateFormat('dd-MM-yyyy').format(startDt);
+    startTime = DateFormat('hh:mm a').format(startDt);
+
+    endDate = DateFormat('dd-MM-yyyy').format(endDt);
+    endTime = DateFormat('hh:mm a').format(endDt);
+  }
 
   @override
   void dispose() {
@@ -157,6 +202,8 @@ class _PetCabScreenState extends State<PetCabScreen> {
             toLng: _toLng,
             date: startDate,
             time: startTime,
+            returnDate: _selectedServiceIndex == 1 ? endDate : null,
+            returnTime: _selectedServiceIndex == 1 ? endTime : null,
             isOneWay: _selectedServiceIndex == 0,
             phoneNumber: widget.phoneNumber,
             petType: _selectedPet,
@@ -610,6 +657,15 @@ class _PetCabScreenState extends State<PetCabScreen> {
                       setState(() {
                         startDate = res['displayDate'] ?? res['date'];
                         startTime = res['time'];
+
+                        final currentStart = _parseDateTime(startDate, startTime);
+                        final currentEnd = _parseDateTime(endDate, endTime);
+                        final minEnd = currentStart.add(const Duration(hours: 3));
+
+                        if (currentEnd.isBefore(minEnd)) {
+                          endDate = DateFormat('dd-MM-yyyy').format(minEnd);
+                          endTime = DateFormat('hh:mm a').format(minEnd);
+                        }
                       });
                     }
                   },
@@ -622,15 +678,40 @@ class _PetCabScreenState extends State<PetCabScreen> {
                     context,
                     'TRIP END',
                     endDate,
-                    endSubtitle,
+                    endTime,
                     (res) {
                       if (res != null) {
-                        setState(() {
-                          endDate = res['displayDate'] ?? res['date'];
-                          endSubtitle = res['dayName'] ?? res['time'];
-                        });
+                        final pickedDate = res['displayDate'] ?? res['date'];
+                        final pickedTime = res['time'];
+
+                        final currentStart = _parseDateTime(startDate, startTime);
+                        final pickedEnd = _parseDateTime(pickedDate, pickedTime);
+                        final minEnd = currentStart.add(const Duration(hours: 3));
+
+                        if (pickedEnd.isBefore(minEnd)) {
+                          setState(() {
+                            endDate = DateFormat('dd-MM-yyyy').format(minEnd);
+                            endTime = DateFormat('hh:mm a').format(minEnd);
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Trip end time must be at least 3 hours after trip start time ($startTime). Set to $endTime.',
+                                style: GoogleFonts.outfit(),
+                              ),
+                              backgroundColor: Colors.black87,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        } else {
+                          setState(() {
+                            endDate = pickedDate;
+                            endTime = pickedTime;
+                          });
+                        }
                       }
                     },
+                    minDateTime: _parseDateTime(startDate, startTime).add(const Duration(hours: 3)),
                   ),
                 ),
               ],
@@ -861,8 +942,9 @@ class _PetCabScreenState extends State<PetCabScreen> {
     String label,
     String date,
     String subText,
-    Function(Map<String, dynamic>?) onResult,
-  ) {
+    Function(Map<String, dynamic>?) onResult, {
+    DateTime? minDateTime,
+  }) {
     return GestureDetector(
       onTap: () async {
         final result = await showDialog<Map<String, dynamic>>(
@@ -871,7 +953,8 @@ class _PetCabScreenState extends State<PetCabScreen> {
               (context) => DateTimePickerDialog(
                 label: label,
                 initialDate: date,
-                initialTime: subText.contains('M') ? subText : '07:00 AM',
+                initialTime: subText,
+                minDateTime: minDateTime,
               ),
         );
         onResult(result);

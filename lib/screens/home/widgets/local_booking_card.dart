@@ -20,8 +20,22 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
   double? _cityLng;
   String? _cityFullAddress;
   int selectedPackageIndex = 1; // 8 hrs / 80 kms by default
-  String startDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
-  String startTime = '07:00 AM';
+  late String startDate;
+  late String startTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    int minute = now.minute;
+    int roundedMinute = ((minute + 14) ~/ 15) * 15;
+    final startDt = roundedMinute == 60
+        ? DateTime(now.year, now.month, now.day, now.hour + 1, 0)
+        : DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+
+    startDate = DateFormat('dd-MM-yyyy').format(startDt);
+    startTime = DateFormat('hh:mm a').format(startDt);
+  }
 
   final List<Map<String, dynamic>> packages = [
     {'time': '5 hrs', 'dist': '50 kms', 'hours': 5, 'kms': 50},

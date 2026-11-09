@@ -12,8 +12,14 @@ import 'payment_pending_screen.dart';
 class BookingReviewScreen extends StatefulWidget {
   final String from;
   final String to;
+  final double? fromLat;
+  final double? fromLng;
+  final double? toLat;
+  final double? toLng;
   final String date;
   final String time;
+  final String? returnDate;
+  final String? returnTime;
   final bool isOneWay;
   final String carName;
   final String price;
@@ -24,13 +30,21 @@ class BookingReviewScreen extends StatefulWidget {
   final bool isAirport;
   final String? airportDirection;
   final String? airportTerminal;
+  final Map<String, dynamic>? pricingDetails;
+  final double? originalPrice;
 
   const BookingReviewScreen({
     super.key,
     required this.from,
     required this.to,
+    this.fromLat,
+    this.fromLng,
+    this.toLat,
+    this.toLng,
     required this.date,
     required this.time,
+    this.returnDate,
+    this.returnTime,
     required this.isOneWay,
     required this.carName,
     required this.price,
@@ -41,6 +55,8 @@ class BookingReviewScreen extends StatefulWidget {
     this.isAirport = false,
     this.airportDirection,
     this.airportTerminal,
+    this.pricingDetails,
+    this.originalPrice,
   });
 
   @override
@@ -78,6 +94,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedPaymentPercent = _advancePercentage;
     String displayPhone = widget.phoneNumber;
     if (displayPhone.startsWith('+91')) {
       displayPhone = displayPhone.substring(3);
@@ -171,10 +188,21 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   double get _finalPrice => (_basePrice + _addonsTotal) - _discount;
 
-  int _selectedPaymentPercent = 25;
-  double get _payableAmount => _selectedPaymentPercent == 0
-      ? 0.0
-      : (_finalPrice * (_selectedPaymentPercent / 100.0));
+  int get _advancePercentage {
+    final advVal = widget.pricingDetails?['advanceValue'] ??
+        widget.pricingDetails?['advancePercentage'] ??
+        widget.pricingDetails?['advancePct'];
+    if (advVal is num && advVal > 0) return advVal.toInt();
+    return 20;
+  }
+
+  int _selectedPaymentPercent = 20;
+
+  double get _payableAmount {
+    if (_selectedPaymentPercent == 0) return 0.0;
+    if (_selectedPaymentPercent == 100) return _finalPrice;
+    return (_finalPrice * (_selectedPaymentPercent / 100.0));
+  }
 
   bool _isCreatingBooking = false;
 
@@ -249,8 +277,14 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       state: 'Default',
       pickupAddress: pickup,
       dropAddress: drop,
+      pickupLat: widget.fromLat?.toString(),
+      pickupLng: widget.fromLng?.toString(),
+      dropLat: widget.toLat?.toString(),
+      dropLng: widget.toLng?.toString(),
       pickupDate: widget.date,
       pickupTime: widget.time,
+      returnDate: widget.returnDate,
+      returnTime: widget.returnTime,
       vehicleCategory: chosenCarCategory,
       seater: 4,
       fare: _finalPrice,
@@ -508,6 +542,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           const SizedBox(height: 6),
           _buildSummaryItem('Car Type:', '${widget.carName} or Equivalent'),
           _buildSummaryItem('Pickup Date:', '${widget.date} ${widget.time}'),
+          if (!widget.isOneWay && widget.returnDate != null)
+            _buildSummaryItem('Return Date:', '${widget.returnDate} ${widget.returnTime ?? ''}'),
           if (widget.airportTerminal != null && widget.airportTerminal!.isNotEmpty)
             _buildSummaryItem('Terminal:', widget.airportTerminal!),
           _buildSummaryItem(
@@ -1215,12 +1251,14 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           const SizedBox(height: 8),
           _buildInclusionPoint(
             Icons.check_circle_rounded,
-            'Base Fare & Fuel Charges',
+            widget.isAirport
+                ? 'Fixed Tier Charges (${widget.pricingDetails?['tier'] ?? 'Airport Transfer'})'
+                : 'Base Fare & Fuel Charges',
             true,
           ),
           _buildInclusionPoint(
             Icons.check_circle_rounded,
-            'Driver Allowance',
+            widget.isAirport ? 'Driver Allowance & Airport Assistance' : 'Driver Allowance',
             true,
           ),
           const SizedBox(height: 8),
@@ -1257,7 +1295,17 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           const SizedBox(height: 8),
           _buildInclusionPoint(Icons.cancel_rounded, 'Toll / State Tax', false),
           _buildInclusionPoint(Icons.cancel_rounded, 'GST (5%)', false),
-          _buildInclusionPoint(Icons.cancel_rounded, 'Parking Charges', false),
+          _buildInclusionPoint(Icons.cancel_rounded, 'Parking Charges (as per actuals)', false),
+          _buildInclusionPoint(
+            Icons.cancel_rounded,
+            'Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour',
+            false,
+          ),
+          _buildInclusionPoint(
+            Icons.cancel_rounded,
+            'Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am)',
+            false,
+          ),
           const SizedBox(height: 6),
           Divider(color: kInputBorder.withValues(alpha: 0.6)),
           const SizedBox(height: 6),
@@ -1271,7 +1319,11 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            '• Night allowance is applicable from 10 PM to 6 AM.\n• Extra kms will be charged at ₹14.5/km.\n• Toll and state tax will be extra as per actuals.',
+            widget.isAirport
+                ? '• 0-15 km: fixed charges of ₹${(widget.pricingDetails?['fare0to15'] ?? widget.pricingDetails?['baseFare'] ?? 750).toInt()}.\n• 15-25 km: fixed charges of ₹${(widget.pricingDetails?['fare15to25'] ?? 1050).toInt()}.\n• Beyond 25 km: Airport flat transfer is redirected to Outstation one-way rates.\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
+                : widget.isOneWay
+                    ? '• Distance Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Billable distance drops into active bracket (e.g. 30 km drops to 0-50 km billable; 200-4000 km charges apply per total km).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
+                    : '• Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Price evaluates: Distance fare vs Total hours fare vs Threshold value (higher applies).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.',
             style: GoogleFonts.outfit(
               fontSize: 11,
               color: kInkSoft,
@@ -1374,7 +1426,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             children: [
               _buildPayOption('Book at ₹0', percent: 0),
               const SizedBox(width: 4),
-              _buildPayOption('Pay 25%', percent: 25),
+              _buildPayOption('Pay $_advancePercentage%', percent: _advancePercentage),
               const SizedBox(width: 4),
               _buildPayOption('Pay 100%', percent: 100),
               const SizedBox(width: 8),

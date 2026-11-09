@@ -7,6 +7,7 @@ import 'widgets/bottom_nav.dart';
 import 'widgets/pet_cab_banner.dart';
 import 'widgets/airport_booking_card.dart';
 import 'widgets/local_booking_card.dart';
+import 'widgets/experience_review_card.dart';
 import '../../theme/app_theme.dart';
 import '../account/account_screen.dart';
 
@@ -26,6 +27,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late int _selectedNavIndex;
   bool _isOneWay = true;
+  String? _prefilledFrom;
+  String? _prefilledTo;
+  double? _prefilledFromLat;
+  double? _prefilledFromLng;
+  double? _prefilledToLat;
+  double? _prefilledToLng;
+  String? _prefilledStartDate;
+  String? _prefilledStartTime;
 
   @override
   void initState() {
@@ -86,6 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
             PetCabBanner(phoneNumber: widget.phoneNumber),
             const SizedBox(height: 4),
             const BannersSection(),
+            const SizedBox(height: 4),
+            const ExperienceReviewCard(),
             const SizedBox(height: 4),
             const ExpertSection(),
           ],
@@ -271,6 +282,14 @@ class _HomeScreenState extends State<HomeScreen> {
           isOneWay: _isOneWay,
           onToggle: (val) => setState(() => _isOneWay = val),
           phoneNumber: widget.phoneNumber,
+          initialFrom: _prefilledFrom,
+          initialTo: _prefilledTo,
+          initialFromLat: _prefilledFromLat,
+          initialFromLng: _prefilledFromLng,
+          initialToLat: _prefilledToLat,
+          initialToLng: _prefilledToLng,
+          initialStartDate: _prefilledStartDate,
+          initialStartTime: _prefilledStartTime,
         );
     }
   }

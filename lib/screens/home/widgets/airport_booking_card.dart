@@ -7,10 +7,15 @@ import '../../../widgets/airport_autocomplete_field.dart';
 import '../../booking/cab_selection_screen.dart';
 import '../../../theme/app_theme.dart';
 import '../../../data/models/airport.dart';
+import '../../../data/services/distance_service.dart';
 
 class AirportBookingCard extends StatefulWidget {
   final String? phoneNumber;
-  const AirportBookingCard({super.key, this.phoneNumber});
+
+  const AirportBookingCard({
+    super.key,
+    this.phoneNumber,
+  });
 
   @override
   State<AirportBookingCard> createState() => _AirportBookingCardState();
@@ -32,8 +37,23 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
   final List<String> _customTerminals = [];
 
   bool isPickup = true;
-  String startDate = DateFormat('dd-MM-yyyy').format(DateTime.now());
-  String startTime = '07:00 AM';
+  double? _estimatedDistance;
+  late String startDate;
+  late String startTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    int minute = now.minute;
+    int roundedMinute = ((minute + 14) ~/ 15) * 15;
+    final startDt = roundedMinute == 60
+        ? DateTime(now.year, now.month, now.day, now.hour + 1, 0)
+        : DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+
+    startDate = DateFormat('dd-MM-yyyy').format(startDt);
+    startTime = DateFormat('hh:mm a').format(startDt);
+  }
 
   @override
   void dispose() {
@@ -42,6 +62,29 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
     _addressController.dispose();
     _addressFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAirportDistancePreview() async {
+    final fromLat = isPickup ? _selectedAirport?.lat : _addressLat;
+    final fromLng = isPickup ? _selectedAirport?.lon : _addressLng;
+    final toLat = isPickup ? _addressLat : _selectedAirport?.lat;
+    final toLng = isPickup ? _addressLng : _selectedAirport?.lon;
+
+    if (fromLat != null && fromLng != null && toLat != null && toLng != null) {
+      try {
+        final dist = await DistanceService.getDistance(
+          _airportController.text.trim(),
+          _addressController.text.trim(),
+          pickupLat: fromLat,
+          pickupLng: fromLng,
+          dropLat: toLat,
+          dropLng: toLng,
+        );
+        if (mounted) {
+          setState(() => _estimatedDistance = dist);
+        }
+      } catch (_) {}
+    }
   }
 
   void _navigateToCabs() {
@@ -87,6 +130,8 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
     final toLat = isPickup ? _addressLat : _selectedAirport?.lat;
     final toLng = isPickup ? _addressLng : _selectedAirport?.lon;
 
+    // Navigate directly to the Cab Selection (calculation) page!
+    // If distance > 25 km, CabSelectionScreen automatically switches to Outstation One Way pricing and cabs.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -101,6 +146,7 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
           time: startTime,
           isOneWay: true,
           isAirport: true,
+          initialDistance: _estimatedDistance,
           airportDirection:
               isPickup ? 'Pickup from airport' : 'Drop to airport',
           airportTerminal: _selectedTerminal,
@@ -380,13 +426,48 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
               );
               _addressFullAddress =
                   (city['display_name'] ?? city['displayName'])?.toString();
+              _checkAirportDistancePreview();
             },
             onChanged: (_) {
               _addressLat = null;
               _addressLng = null;
               _addressFullAddress = null;
+              if (_estimatedDistance != null) {
+                setState(() => _estimatedDistance = null);
+              }
             },
           ),
+          if (_estimatedDistance != null && _estimatedDistance! > 25.0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDBA74)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xFFC2410C),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Trip distance is ${_estimatedDistance!.toStringAsFixed(1)} km (> 25 km limit). Cabs will calculate with Outstation One Way pricing.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF9A3412),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
 
           // Trip Start Date & Time

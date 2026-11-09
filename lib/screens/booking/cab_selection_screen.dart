@@ -15,6 +15,8 @@ class CabSelectionScreen extends StatefulWidget {
   final double? toLng;
   final String date;
   final String time;
+  final String? returnDate;
+  final String? returnTime;
   final bool isOneWay;
   final String phoneNumber;
   final String? petType;
@@ -25,6 +27,7 @@ class CabSelectionScreen extends StatefulWidget {
   final String? airportDirection;
   final String? airportTerminal;
   final String? airportName;
+  final double? initialDistance;
 
   const CabSelectionScreen({
     super.key,
@@ -36,6 +39,8 @@ class CabSelectionScreen extends StatefulWidget {
     this.toLng,
     required this.date,
     required this.time,
+    this.returnDate,
+    this.returnTime,
     required this.isOneWay,
     required this.phoneNumber,
     this.petType,
@@ -46,6 +51,7 @@ class CabSelectionScreen extends StatefulWidget {
     this.airportDirection,
     this.airportTerminal,
     this.airportName,
+    this.initialDistance,
   });
 
   @override
@@ -61,8 +67,12 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
   Map<String, double> _calculatedPrices = {};
   final Map<String, double> _perKmRates = {};
   final Map<String, double> _includedKms = {};
+  final Map<String, Map<String, dynamic>> _pricingDetails = {};
+  final Map<String, double> _originalPrices = {};
   bool _isLoading = true;
   double _distance = 0.0;
+  bool _redirectedToOutstation = false;
+  String? _airportRedirectNotice;
 
   @override
   void initState() {
@@ -80,11 +90,13 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     setState(() => _isLoading = true);
 
     // 1. Calculate one-way road distance using exact coordinates or geocoding
-    double oneWayDist = 0.0;
+    double oneWayDist = (widget.initialDistance != null && widget.initialDistance! > 0)
+        ? widget.initialDistance!
+        : 0.0;
     if (widget.isRental) {
       oneWayDist = (widget.includedKms ?? 50).toDouble();
       _distance = oneWayDist;
-    } else {
+    } else if (oneWayDist <= 0.0) {
       oneWayDist = await DistanceService.getDistance(
         widget.from,
         widget.to,
@@ -95,15 +107,25 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
       );
       // For roundtrip, travel distance is 2x one-way
       _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
+    } else {
+      _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
     }
 
     // 2. Fetch all categories
     final categories = await CarService.getCarCategories();
 
+    final bool exceedsAirportLimit =
+        widget.isAirport && (oneWayDist > 25.0 || _distance > 25.0);
+    if (exceedsAirportLimit) {
+      _redirectedToOutstation = true;
+      _airportRedirectNotice =
+          'Trip distance (${(oneWayDist > 0 ? oneWayDist : _distance).toStringAsFixed(1)} km) exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
+    }
+
     // 3. Fetch prices for each category
     final String rideType = widget.isRental
         ? 'Rental'
-        : (widget.isAirport
+        : ((widget.isAirport && !_redirectedToOutstation)
             ? 'Airport'
             : (widget.isOneWay ? 'Oneway' : 'Roundtrip'));
 
@@ -121,6 +143,11 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
         dropLat: widget.toLat,
         dropLng: widget.toLng,
         days: 1,
+        pickupDate: widget.date,
+        pickupTime: widget.time,
+        returnDate: widget.returnDate,
+        returnTime: widget.returnTime,
+        airportName: _redirectedToOutstation ? null : widget.airportName,
         packageHours: widget.packageHours,
         includedKms: widget.includedKms,
         petType: widget.petType,
@@ -134,6 +161,12 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           result['fare'] != null &&
           (result['fare'] as num) > 0) {
         prices[cat.name] = (result['fare'] as num).toDouble();
+        _originalPrices[cat.name] = (result['originalFare'] as num?)?.toDouble() ?? (prices[cat.name]! * 1.12);
+        if (result['redirectedToOutstation'] == true || exceedsAirportLimit) {
+          _redirectedToOutstation = true;
+          _airportRedirectNotice = result['airportNotice']?.toString() ??
+              'Trip distance exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
+        }
         if (_distance <= 0 &&
             result['distance'] != null &&
             (result['distance'] as num) > 0) {
@@ -147,9 +180,14 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                 : (result['details'] is Map
                     ? Map<String, dynamic>.from(result['details'] as Map)
                     : null);
+        if (details != null) {
+          _pricingDetails[cat.name] = details;
+        }
 
         if (widget.isRental && (widget.includedKms ?? 0) > 0) {
           _includedKms[cat.name] = (widget.includedKms!).toDouble();
+        } else if (widget.isAirport && details != null && details['baseKms'] != null) {
+          _includedKms[cat.name] = (details['baseKms'] as num).toDouble();
         } else if (details != null &&
             details['billableKms'] != null &&
             (details['billableKms'] as num) > 0) {
@@ -164,7 +202,9 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
         }
 
         double rate = 0.0;
-        if (details != null &&
+        if (widget.isAirport && details != null && details['extraKmRate'] != null) {
+          rate = (details['extraKmRate'] as num).toDouble();
+        } else if (details != null &&
             details['extraKmRate'] != null &&
             (details['extraKmRate'] as num) > 0) {
           rate = (details['extraKmRate'] as num).toDouble();
@@ -177,10 +217,9 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             (details['perKm'] as num) > 0) {
           rate = (details['perKm'] as num).toDouble();
         }
-        _perKmRates[cat.name] = _getDefaultPerKmRate(
-          cat.name,
-          rate > 0 ? rate : cat.perKmRate,
-        );
+        _perKmRates[cat.name] = rate > 0
+            ? rate
+            : _getDefaultPerKmRate(cat.name, cat.perKmRate);
       } else {
         final fallbackRate = _getDefaultPerKmRate(cat.name, cat.perKmRate);
         final effectiveDist =
@@ -216,7 +255,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
       '25',
       'traveller',
       'tempo',
-      'hatchback',
     ];
     categories.sort((a, b) {
       String nameA = ((a.displayName) + (a.name)).toLowerCase();
@@ -279,6 +317,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
+
         ],
       ),
       body: Column(
@@ -302,13 +341,15 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       Row(
                         children: [
                           Text(
-                            widget.isAirport
-                                ? (widget.airportDirection ?? 'Airport Transfer')
-                                : (widget.isRental
-                                    ? 'Rental Package'
-                                    : (widget.isOneWay ? 'One Way' : 'Round Trip')),
+                            _redirectedToOutstation
+                                ? 'Outstation Oneway (Airport Distance > 25 km)'
+                                : (widget.isAirport
+                                    ? (widget.airportDirection ?? 'Airport Transfer')
+                                    : (widget.isRental
+                                        ? 'Rental Package'
+                                        : (widget.isOneWay ? 'One Way' : 'Round Trip'))),
                             style: GoogleFonts.outfit(
-                              color: kAmberDeep,
+                              color: _redirectedToOutstation ? const Color(0xFFC2410C) : kAmberDeep,
                               fontSize: 10.5,
                               fontWeight: FontWeight.bold,
                             ),
@@ -389,6 +430,34 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ],
             ),
           ),
+          if (_redirectedToOutstation)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFDBA74)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: Color(0xFFC2410C), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _airportRedirectNotice ??
+                          'Trip distance exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.',
+                      style: GoogleFonts.outfit(
+                        color: const Color(0xFF9A3412),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
 
           // Car Selection List with arrows & Main Car Details Card
           if (_isLoading)
@@ -600,6 +669,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     final car = _carCategories[safeIndex];
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: kCardBg,
         borderRadius: BorderRadius.circular(18),
@@ -610,10 +680,11 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Left side: name, subtitle, discount, price
               Expanded(
+                flex: 5,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -707,7 +778,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                     const SizedBox(height: 2),
                     // Strikethrough price
                     Text(
-                      '₹${((_calculatedPrices[car.name] ?? car.baseFare) * 1.12).toInt()}',
+                      '₹${(_originalPrices[car.name] ?? ((_calculatedPrices[car.name] ?? car.baseFare) * 1.12)).toInt()}',
                       style: GoogleFonts.outfit(
                         color: kInkSoft.withValues(alpha: 0.6),
                         decoration: TextDecoration.lineThrough,
@@ -733,25 +804,31 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
               const SizedBox(width: 8),
               // Right side: car image - prominent and clearly visible
-              Image.asset(
-                _getCarImage(car.name),
-                width: 200,
-                height: 120,
-                fit: BoxFit.contain,
-                errorBuilder:
-                    (context, error, stackTrace) => Container(
-                      width: 200,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: kInputBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: kInkSoft,
-                        size: 48,
-                      ),
+              Expanded(
+                flex: 4,
+                child: SizedBox(
+                  height: 115,
+                  child: Transform.scale(
+                    scale: 1.35,
+                    alignment: Alignment.centerRight,
+                    child: Image.asset(
+                      _getCarImage(car.name),
+                      fit: BoxFit.contain,
+                      errorBuilder:
+                          (context, error, stackTrace) => Container(
+                            decoration: BoxDecoration(
+                              color: kInputBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.directions_car,
+                              color: kInkSoft,
+                              size: 48,
+                            ),
+                          ),
                     ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -801,6 +878,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ],
             ),
           ),
+
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () {
@@ -811,13 +889,19 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       (context) => BookingReviewScreen(
                         from: widget.from,
                         to: widget.to,
+                        fromLat: widget.fromLat,
+                        fromLng: widget.fromLng,
+                        toLat: widget.toLat,
+                        toLng: widget.toLng,
                         date: widget.date,
                         time: widget.time,
-                        isOneWay: widget.isOneWay,
+                        returnDate: widget.returnDate,
+                        returnTime: widget.returnTime,
+                        isOneWay: _redirectedToOutstation ? true : widget.isOneWay,
                         isRental: widget.isRental,
-                        isAirport: widget.isAirport,
-                        airportDirection: widget.airportDirection,
-                        airportTerminal: widget.airportTerminal,
+                        isAirport: widget.isAirport && !_redirectedToOutstation,
+                        airportDirection: _redirectedToOutstation ? null : widget.airportDirection,
+                        airportTerminal: _redirectedToOutstation ? null : widget.airportTerminal,
                         rentalPackage:
                             widget.isRental
                                 ? '${widget.packageHours ?? 8} hrs / ${widget.includedKms ?? 80} kms'
@@ -830,6 +914,8 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                             '₹ ${(_calculatedPrices[car.name] ?? car.baseFare).toInt()}',
                         phoneNumber: widget.phoneNumber,
                         petType: widget.petType,
+                        pricingDetails: _pricingDetails[car.name],
+                        originalPrice: _originalPrices[car.name],
                       ),
                 ),
               );
@@ -855,6 +941,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
+
         ],
       ),
     );
@@ -948,6 +1035,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
+
         ],
       ),
     );
@@ -996,6 +1084,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
+
         ],
       ),
     );
@@ -1024,6 +1113,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               'Book Now\nat Zero Cost',
             ),
           ),
+
           _buildInfoDivider(),
           Expanded(
             child: _buildInfoItem(
@@ -1031,6 +1121,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               'Free Cancellations\nTill 1 Hour',
             ),
           ),
+
           _buildInfoDivider(),
           Expanded(
             child: _buildInfoItem(
@@ -1038,6 +1129,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               '24x7\nCustomer Support',
             ),
           ),
+
         ],
       ),
     );
@@ -1142,14 +1234,114 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
   }
 
   List<Widget> _buildTabContent() {
+    final currentCar = _carCategories.isNotEmpty && _selectedCarIndex < _carCategories.length
+        ? _carCategories[_selectedCarIndex]
+        : null;
+    final details = currentCar != null ? _pricingDetails[currentCar.name] : null;
+
+    if (widget.isAirport && !_redirectedToOutstation) {
+      final baseKms = 15;
+      final maxKms = (details?['maxAirportKms'] as num?)?.toInt() ?? 25;
+      final fare0to15 = (details?['fare0to15'] as num?)?.toInt() ?? (details?['baseFare'] as num?)?.toInt() ?? 750;
+      final fare15to25 = (details?['fare15to25'] as num?)?.toInt() ?? 1050;
+      final waitingCharge = (details?['waitingChargePerHour'] ?? details?['waitingCharge'] as num?)?.toInt() ?? 150;
+      final nightAllowance = (details?['nightAllowance'] as num?)?.toInt() ?? 250;
+      final threshold = (details?['threshold'] as num?)?.toInt() ?? 500;
+      final activeTier = details?['tier']?.toString() ?? (_distance <= 15 ? '0-15 km' : '15-25 km');
+
+      switch (_tabController.index) {
+        case 0: // INCLUSIONS
+          return [
+            _buildTabDetailItem(Icons.local_gas_station_rounded, 'Fixed Tier Charges ($activeTier)'),
+            _buildTabDetailItem(Icons.person_rounded, 'Driver Allowance'),
+            _buildTabDetailItem(Icons.flight_land_rounded, 'Airport Pickup / Drop Assistance'),
+          ];
+        case 1: // EXCLUSIONS
+          return [
+            _buildTabDetailItem(Icons.receipt_long_rounded, 'Toll / State tax'),
+            _buildTabDetailItem(Icons.account_balance_wallet_rounded, 'GST (5%)'),
+            _buildTabDetailItem(Icons.local_parking_rounded, 'Parking Charges (as per actuals)'),
+            _buildTabDetailItem(
+              Icons.timer_outlined,
+              'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
+            ),
+            _buildTabDetailItem(
+              Icons.nightlight_round,
+              'Night driving allowances: ₹$nightAllowance/- (Applicable once if ride time falls between 11 pm till 6 am)',
+            ),
+          ];
+        case 2: // FACILITIES
+          return [
+            _buildTabDetailItem(Icons.ac_unit_rounded, 'Air Conditioner'),
+            _buildTabDetailItem(Icons.luggage_rounded, 'Luggage Space'),
+            _buildTabDetailItem(Icons.music_note_rounded, 'Music System'),
+          ];
+        case 3: // T&C
+          return [
+            _buildTabDetailItem(
+              Icons.speed_rounded,
+              '0-$baseKms km fixed charges: ₹$fare0to15',
+            ),
+            _buildTabDetailItem(
+              Icons.speed_rounded,
+              '$baseKms-$maxKms km fixed charges: ₹$fare15to25',
+            ),
+            _buildTabDetailItem(
+              Icons.alt_route_rounded,
+              'Beyond $maxKms km: Redirected to Outstation rates',
+            ),
+            _buildTabDetailItem(
+              Icons.timer_outlined,
+              'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
+            ),
+            _buildTabDetailItem(
+              Icons.nightlight_round,
+              'Night driving allowance: ₹$nightAllowance/- (11 PM till 6 AM)',
+            ),
+            _buildTabDetailItem(
+              Icons.payment_rounded,
+              'Threshold value: ₹$threshold to confirm booking',
+            ),
+          ];
+        default:
+          return [];
+      }
+    }
+
+    final slab = details?['slab']?.toString() ??
+        (_distance <= 50
+            ? '0-50 km'
+            : _distance <= 100
+                ? '51-100 km'
+                : _distance <= 150
+                    ? '101-150 km'
+                    : _distance <= 200
+                        ? '151-200 km'
+                        : 'Upto 4000 km');
+    final billableKms = (details?['billableKms'] as num?)?.toInt() ?? (_distance <= 50 ? 50 : _distance.toInt());
+    final waitingCharge = (details?['waitingChargePerHour'] ?? details?['waitingCharge'] as num?)?.toInt() ?? 150;
+    final nightAllowance = (details?['nightAllowance'] as num?)?.toInt() ?? 250;
+    final threshold = (details?['threshold'] as num?)?.toInt() ?? 500;
+
     switch (_tabController.index) {
       case 0: // INCLUSIONS
         return [
           _buildTabDetailItem(Icons.local_gas_station_rounded, 'Fuel Charges'),
           _buildTabDetailItem(Icons.person_rounded, 'Driver Allowance'),
-          if (!widget.isOneWay) ...[
-            _buildTabDetailItem(Icons.timer_rounded, 'Driving Allowance'),
-            _buildTabDetailItem(Icons.hourglass_empty_rounded, 'Hour Charges'),
+          if (widget.isOneWay) ...[
+            _buildTabDetailItem(
+              Icons.speed_rounded,
+              'Base Distance Slab ($slab - billable $billableKms kms)',
+            ),
+          ] else ...[
+            _buildTabDetailItem(
+              Icons.speed_rounded,
+              'Roundtrip Distance ($slab - ${_distance.toStringAsFixed(0)} kms)',
+            ),
+            _buildTabDetailItem(
+              Icons.timer_rounded,
+              'Trip Duration: ${(details?['totalHours'] as num?)?.toInt() ?? 4} hrs',
+            ),
           ],
         ];
       case 1: // EXCLUSIONS
@@ -1157,6 +1349,14 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           _buildTabDetailItem(Icons.receipt_long_rounded, 'Toll / State tax'),
           _buildTabDetailItem(Icons.account_balance_wallet_rounded, 'GST (5%)'),
           _buildTabDetailItem(Icons.local_parking_rounded, 'Parking Charges'),
+          _buildTabDetailItem(
+            Icons.timer_outlined,
+            'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
+          ),
+          _buildTabDetailItem(
+            Icons.nightlight_round,
+            'Night driving allowances: ₹$nightAllowance/- (Applicable once if ride time falls between 11 pm till 6 am)',
+          ),
         ];
       case 2: // FACILITIES
         return [
@@ -1165,18 +1365,46 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           _buildTabDetailItem(Icons.music_note_rounded, 'Music System'),
         ];
       case 3: // T&C
+        if (widget.isOneWay) {
+          return [
+            _buildTabDetailItem(
+              Icons.alt_route_rounded,
+              'Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km',
+            ),
+            _buildTabDetailItem(
+              Icons.timer_outlined,
+              'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
+            ),
+            _buildTabDetailItem(
+              Icons.nightlight_round,
+              'Night driving allowances: ₹$nightAllowance/- (11 PM till 6 AM)',
+            ),
+            _buildTabDetailItem(
+              Icons.payment_rounded,
+              'Threshold value: ₹$threshold to confirm booking',
+            ),
+          ];
+        }
         return [
           _buildTabDetailItem(
-            Icons.info_outline_rounded,
-            'Night allowance applicable (10 PM - 6 AM)',
+            Icons.alt_route_rounded,
+            'Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km',
           ),
           _buildTabDetailItem(
-            Icons.speed_rounded,
-            'Extra kms will be charged per km rate',
+            Icons.compare_arrows_rounded,
+            'Fare evaluates: Distance fare vs Total hours fare vs Threshold (higher applies)',
           ),
           _buildTabDetailItem(
-            Icons.article_outlined,
-            'Toll and state tax as per actuals',
+            Icons.timer_outlined,
+            'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
+          ),
+          _buildTabDetailItem(
+            Icons.nightlight_round,
+            'Night driving allowances: ₹$nightAllowance/- (11 PM till 6 AM)',
+          ),
+          _buildTabDetailItem(
+            Icons.payment_rounded,
+            'Threshold value: ₹$threshold to confirm booking',
           ),
         ];
       default:
@@ -1209,6 +1437,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
+
         ],
       ),
     );
