@@ -283,76 +283,66 @@ class _LoginScreenState extends State<LoginScreen>
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(5),
+        width: 108,
+        height: 108,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFFD54F), kAmberDeep],
-          ),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
               color: kAmber.withValues(alpha: 0.55),
-              blurRadius: 45,
+              blurRadius: 36,
               spreadRadius: 2,
               offset: const Offset(0, 14),
             ),
             BoxShadow(
-              color: kAmberDeep.withValues(alpha: 0.25),
-              blurRadius: 80,
-              spreadRadius: 8,
+              color: kAmberDeep.withValues(alpha: 0.3),
+              blurRadius: 70,
+              spreadRadius: 6,
             ),
           ],
         ),
-        child: Container(
-          padding: const EdgeInsets.all(3),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-          child: ClipOval(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/logo.jpeg',
-                  height: 92,
-                  width: 92,
-                  fit: BoxFit.cover,
-                ),
-                // Shimmer sweep
-                AnimatedBuilder(
-                  animation: _shimmerController,
-                  builder: (context, _) {
-                    return Positioned.fill(
-                      child: IgnorePointer(
-                        child: Transform.translate(
-                          offset: Offset(
-                            -100 + (_shimmerController.value * 220),
-                            0,
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.white.withValues(alpha: 0.0),
-                                  Colors.white.withValues(alpha: 0.55),
-                                  Colors.white.withValues(alpha: 0.0),
-                                ],
-                                stops: const [0.35, 0.5, 0.65],
-                              ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                'assets/images/logo.png',
+                height: 108,
+                width: 108,
+                fit: BoxFit.cover,
+              ),
+              // Shimmer sweep
+              AnimatedBuilder(
+                animation: _shimmerController,
+                builder: (context, _) {
+                  return Positioned.fill(
+                    child: IgnorePointer(
+                      child: Transform.translate(
+                        offset: Offset(
+                          -120 + (_shimmerController.value * 260),
+                          0,
+                        ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withValues(alpha: 0.0),
+                                Colors.white.withValues(alpha: 0.55),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                              stops: const [0.35, 0.5, 0.65],
                             ),
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),

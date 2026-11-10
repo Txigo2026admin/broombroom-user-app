@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/services/booking_service.dart';
 import '../../data/models/booking.dart';
 import '../../theme/app_theme.dart';
+import '../booking/booking_support_screen.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -419,7 +420,22 @@ class _BookingsScreenState extends State<BookingsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookingSupportScreen(
+                                bookingId: crn,
+                                pickupAddress: from,
+                                dropAddress: to,
+                                date: date,
+                                time: time,
+                                status: status,
+                                vehicleCategory: cabType,
+                              ),
+                            ),
+                          );
+                        },
                         child: Container(
                           height: 46,
                           decoration: BoxDecoration(

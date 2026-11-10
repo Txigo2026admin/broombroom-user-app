@@ -22,6 +22,7 @@ class DateTimePickerDialog extends StatefulWidget {
 }
 
 class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
+  late DateTime effectiveMinDateTime;
   late List<DateTime> rawDates;
   late List<String> dates;
   late List<String> hours;
@@ -33,9 +34,48 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
   late int selectedMinuteIndex;
   late int selectedPeriodIndex;
 
+  static DateTime calculateDefaultMinTime() {
+    final now = DateTime.now();
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
+  }
+
+  void _applyDateTimeToIndices(DateTime dt) {
+    int h = dt.hour;
+    String p = h >= 12 ? 'PM' : 'AM';
+    if (h > 12) h -= 12;
+    if (h == 0) h = 12;
+    selectedHourIndex = hours.indexOf(h.toString());
+    if (selectedHourIndex == -1) selectedHourIndex = 0;
+    selectedPeriodIndex = periods.indexOf(p);
+    if (selectedPeriodIndex == -1) selectedPeriodIndex = 0;
+
+    int mVal = dt.minute;
+    int closestMinIdx = 0;
+    int minDiff = 999;
+    for (int i = 0; i < minutes.length; i++) {
+      int diff = (int.parse(minutes[i]) - mVal).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestMinIdx = i;
+      }
+    }
+    selectedMinuteIndex = closestMinIdx;
+  }
+
   @override
   void initState() {
     super.initState();
+    effectiveMinDateTime = widget.minDateTime ?? calculateDefaultMinTime();
     _generateDates();
     hours = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
     minutes = ['00', '15', '30', '45'];
@@ -43,27 +83,27 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
 
     // Match initial date
     selectedDateIndex = 0;
+    DateTime? parsedDate;
     if (widget.initialDate.isNotEmpty) {
-      DateTime? parsed;
       try {
         if (widget.initialDate.contains('-')) {
-          parsed = DateFormat('dd-MM-yyyy').parse(widget.initialDate);
+          parsedDate = DateFormat('dd-MM-yyyy').parse(widget.initialDate);
         } else if (widget.initialDate.toLowerCase().contains('today')) {
-          parsed = DateTime.now();
+          parsedDate = DateTime.now();
         } else {
-          parsed = DateFormat('EEE MMM dd').parse(widget.initialDate);
+          parsedDate = DateFormat('EEE MMM dd').parse(widget.initialDate);
         }
       } catch (_) {
         try {
-          parsed = DateFormat('E MMM dd').parse(widget.initialDate);
+          parsedDate = DateFormat('E MMM dd').parse(widget.initialDate);
         } catch (_) {}
       }
 
-      if (parsed != null) {
+      if (parsedDate != null) {
         for (int i = 0; i < rawDates.length; i++) {
-          if (rawDates[i].year == parsed.year &&
-              rawDates[i].month == parsed.month &&
-              rawDates[i].day == parsed.day) {
+          if (rawDates[i].year == parsedDate.year &&
+              rawDates[i].month == parsedDate.month &&
+              rawDates[i].day == parsedDate.day) {
             selectedDateIndex = i;
             break;
           }
@@ -71,62 +111,58 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
       }
     }
 
-    // Match initial time (or default to minDateTime or current time)
+    // Match initial time
+    bool initialTimeSet = false;
     try {
       String time = widget.initialTime.trim();
-      if (time.isEmpty) {
-        throw Exception();
-      }
-      if (time.contains(':') && time.contains(' ')) {
+      if (time.isNotEmpty && time.contains(':') && time.contains(' ')) {
         String h = int.parse(time.split(':')[0].trim()).toString();
         String m = time.split(':')[1].split(' ')[0].trim();
         String p = time.split(' ')[1].trim().toUpperCase();
 
-        selectedHourIndex = hours.indexOf(h);
-        if (selectedHourIndex == -1) {
-          int hVal = int.tryParse(h) ?? 1;
-          if (hVal > 12) hVal -= 12;
-          if (hVal == 0) hVal = 12;
-          selectedHourIndex = hours.indexOf(hVal.toString());
-        }
+        int parsedH = int.parse(h);
+        int parsedM = int.parse(m);
+        int full24H = parsedH;
+        if (p == 'PM' && full24H < 12) full24H += 12;
+        if (p == 'AM' && full24H == 12) full24H = 0;
 
-        int mVal = int.tryParse(m) ?? 0;
-        int closestMinIdx = 0;
-        int minDiff = 999;
-        for (int i = 0; i < minutes.length; i++) {
-          int diff = (int.parse(minutes[i]) - mVal).abs();
-          if (diff < minDiff) {
-            minDiff = diff;
-            closestMinIdx = i;
+        DateTime targetDate = rawDates[selectedDateIndex];
+        DateTime fullDt = DateTime(
+          targetDate.year,
+          targetDate.month,
+          targetDate.day,
+          full24H,
+          parsedM,
+        );
+
+        if (!fullDt.isBefore(effectiveMinDateTime)) {
+          selectedHourIndex = hours.indexOf(
+            parsedH > 12
+                ? (parsedH - 12).toString()
+                : (parsedH == 0 ? '12' : parsedH.toString()),
+          );
+          if (selectedHourIndex == -1) selectedHourIndex = 0;
+
+          int closestMinIdx = 0;
+          int minDiff = 999;
+          for (int i = 0; i < minutes.length; i++) {
+            int diff = (int.parse(minutes[i]) - parsedM).abs();
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestMinIdx = i;
+            }
           }
+          selectedMinuteIndex = closestMinIdx;
+          selectedPeriodIndex = periods.indexOf(p);
+          if (selectedPeriodIndex == -1) selectedPeriodIndex = 0;
+          initialTimeSet = true;
         }
-        selectedMinuteIndex = closestMinIdx;
-        selectedPeriodIndex = periods.indexOf(p);
-      } else {
-        throw Exception();
       }
-    } catch (_) {
-      final fallback = widget.minDateTime ?? DateTime.now();
-      int h = fallback.hour;
-      String p = h >= 12 ? 'PM' : 'AM';
-      if (h > 12) h -= 12;
-      if (h == 0) h = 12;
-      selectedHourIndex = hours.indexOf(h.toString());
-      if (selectedHourIndex == -1) selectedHourIndex = 0;
-      selectedPeriodIndex = periods.indexOf(p);
-      if (selectedPeriodIndex == -1) selectedPeriodIndex = 0;
+    } catch (_) {}
 
-      int mVal = fallback.minute;
-      int closestMinIdx = 0;
-      int minDiff = 999;
-      for (int i = 0; i < minutes.length; i++) {
-        int diff = (int.parse(minutes[i]) - mVal).abs();
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestMinIdx = i;
-        }
-      }
-      selectedMinuteIndex = closestMinIdx;
+    if (!initialTimeSet) {
+      // Default directly to effectiveMinDateTime (always at least 15 mins after current time)
+      _applyDateTimeToIndices(effectiveMinDateTime);
     }
 
     if (selectedHourIndex == -1) selectedHourIndex = 0;
@@ -137,7 +173,7 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
   void _generateDates() {
     rawDates = [];
     dates = [];
-    final baseDate = widget.minDateTime ?? DateTime.now();
+    final baseDate = effectiveMinDateTime;
     DateTime start = DateTime(baseDate.year, baseDate.month, baseDate.day);
     DateTime today = DateTime.now();
     DateTime todayStart = DateTime(today.year, today.month, today.day);
@@ -158,11 +194,25 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
   @override
   Widget build(BuildContext context) {
     DateTime currentSelectedDate = rawDates[selectedDateIndex];
-    String formattedSummaryDate = DateFormat('EEE, dd MMM').format(currentSelectedDate);
+    String formattedSummaryDate =
+        DateFormat('EEE, dd MMM').format(currentSelectedDate);
     String formattedHour = hours[selectedHourIndex].padLeft(2, '0');
     String formattedMinute = minutes[selectedMinuteIndex];
     String currentPeriod = periods[selectedPeriodIndex];
     String formattedTime = '$formattedHour:$formattedMinute $currentPeriod';
+
+    int curH = int.parse(hours[selectedHourIndex]);
+    int curM = int.parse(minutes[selectedMinuteIndex]);
+    if (currentPeriod == 'PM' && curH < 12) curH += 12;
+    if (currentPeriod == 'AM' && curH == 12) curH = 0;
+    DateTime currentFullDt = DateTime(
+      currentSelectedDate.year,
+      currentSelectedDate.month,
+      currentSelectedDate.day,
+      curH,
+      curM,
+    );
+    bool isPast = currentFullDt.isBefore(effectiveMinDateTime);
 
     return Dialog(
       backgroundColor: kCardBg,
@@ -283,22 +333,49 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
               decoration: BoxDecoration(
                 color: kInputBg,
                 border: Border.all(
-                  color: kInputBorder,
-                  width: 1.2,
+                  color:
+                      isPast
+                          ? Colors.redAccent.withValues(alpha: 0.8)
+                          : kInputBorder,
+                  width: isPast ? 1.5 : 1.2,
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.label.toUpperCase(),
-                    style: GoogleFonts.outfit(
-                      fontSize: 10.5,
-                      color: kAmberDeep,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        widget.label.toUpperCase(),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          color: kAmberDeep,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      if (isPast)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'PAST TIME',
+                            style: GoogleFonts.outfit(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -313,11 +390,34 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
                   Text(
                     formattedTime,
                     style: GoogleFonts.outfit(
-                      color: kInkSoft,
+                      color: isPast ? Colors.redAccent : kInkSoft,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (isPast) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 13,
+                          color: Colors.redAccent,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Must be at least 15 min after current time (Min: ${DateFormat('hh:mm a').format(effectiveMinDateTime)})',
+                            style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -332,41 +432,62 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
                 String p = periods[selectedPeriodIndex];
                 if (p == 'PM' && h < 12) h += 12;
                 if (p == 'AM' && h == 12) h = 0;
-                DateTime fullDt = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, h, m);
+                DateTime fullDt = DateTime(
+                  selectedDate.year,
+                  selectedDate.month,
+                  selectedDate.day,
+                  h,
+                  m,
+                );
 
-                String finalTime = formattedTime;
-                DateTime finalDate = selectedDate;
+                if (fullDt.isBefore(effectiveMinDateTime)) {
+                  // Past or too early time selected: clamp to minimum allowed future time
+                  fullDt = effectiveMinDateTime;
+                  final clampedDate = DateTime(
+                    fullDt.year,
+                    fullDt.month,
+                    fullDt.day,
+                  );
+                  final clampedTime = DateFormat('hh:mm a').format(fullDt);
 
-                if (widget.minDateTime != null && fullDt.isBefore(widget.minDateTime!)) {
-                  fullDt = widget.minDateTime!;
-                  finalDate = DateTime(fullDt.year, fullDt.month, fullDt.day);
-                  int clampedH = fullDt.hour;
-                  String clampedP = clampedH >= 12 ? 'PM' : 'AM';
-                  if (clampedH > 12) clampedH -= 12;
-                  if (clampedH == 0) clampedH = 12;
-                  String clampedHourStr = clampedH.toString().padLeft(2, '0');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Trip start cannot be in the past. Calculated earliest time: $clampedTime.',
+                        style: GoogleFonts.outfit(),
+                      ),
+                      backgroundColor: Colors.black87,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
 
-                  int clampedMVal = fullDt.minute;
-                  int clampedMinIdx = 0;
-                  int diffMin = 999;
-                  for (int i = 0; i < minutes.length; i++) {
-                    int diff = (int.parse(minutes[i]) - clampedMVal).abs();
-                    if (diff < diffMin) {
-                      diffMin = diff;
-                      clampedMinIdx = i;
-                    }
-                  }
-                  String clampedMinStr = minutes[clampedMinIdx];
-                  finalTime = '$clampedHourStr:$clampedMinStr $clampedP';
+                  Navigator.pop(context, {
+                    'date': DateFormat('dd-MM-yyyy').format(clampedDate),
+                    'displayDate': DateFormat(
+                      'dd-MM-yyyy',
+                    ).format(clampedDate),
+                    'summaryDate': DateFormat(
+                      'EEE, dd MMM',
+                    ).format(clampedDate),
+                    'dayName': DateFormat('EEEE').format(clampedDate),
+                    'time': clampedTime,
+                    'rawDate': clampedDate,
+                    'fullDateTime': fullDt,
+                  });
+                  return;
                 }
 
                 Navigator.pop(context, {
-                  'date': DateFormat('dd-MM-yyyy').format(finalDate),
-                  'displayDate': DateFormat('dd-MM-yyyy').format(finalDate),
-                  'summaryDate': DateFormat('EEE, dd MMM').format(finalDate),
-                  'dayName': DateFormat('EEEE').format(finalDate),
-                  'time': finalTime,
-                  'rawDate': finalDate,
+                  'date': DateFormat('dd-MM-yyyy').format(selectedDate),
+                  'displayDate': DateFormat(
+                    'dd-MM-yyyy',
+                  ).format(selectedDate),
+                  'summaryDate': DateFormat(
+                    'EEE, dd MMM',
+                  ).format(selectedDate),
+                  'dayName': DateFormat('EEEE').format(selectedDate),
+                  'time': formattedTime,
+                  'rawDate': selectedDate,
                   'fullDateTime': fullDt,
                 });
               },

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'account_details_screen.dart';
 import 'bookings_screen.dart';
 import 'content_hub_screen.dart';
+import '../booking/booking_support_screen.dart';
 import '../home/widgets/experience_review_card.dart';
 import '../../theme/app_theme.dart';
 
@@ -49,12 +50,12 @@ class AccountScreen extends StatelessWidget {
           ),
           // Content
           Positioned.fill(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
                   // Profile Picture
                   Center(
                     child: Container(
@@ -81,32 +82,38 @@ class AccountScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
                   // Menu Items
                   _buildMenuItem(
                     context,
                     'My bookings',
                     Icons.calendar_today_rounded,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildMenuItem(
                     context,
                     'Account details',
                     Icons.manage_accounts_rounded,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildMenuItem(
                     context,
                     'Road trips for you',
                     Icons.explore_rounded,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildMenuItem(
                     context,
                     'Rate your experience',
                     Icons.star_rounded,
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
+                  _buildMenuItem(
+                    context,
+                    'Help & Support (FAQs)',
+                    Icons.support_agent_rounded,
+                  ),
+                  const SizedBox(height: 32),
                   // Social Media Icons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -120,7 +127,7 @@ class AccountScreen extends StatelessWidget {
                       _buildSocialIcon(Icons.play_circle_fill_rounded),
                     ],
                   ),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -138,31 +145,34 @@ class AccountScreen extends StatelessWidget {
         border: Border.all(color: kInputBorder.withValues(alpha: 0.8)),
         boxShadow: kCardShadow(opacity: 0.12),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: kAmberSoft,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kInputBorder),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kAmberSoft,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kInputBorder),
+            ),
+            child: Icon(icon, color: kAmberDeep, size: 20),
           ),
-          child: Icon(icon, color: kAmberDeep, size: 20),
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.outfit(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: kInk,
+          title: Text(
+            title,
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: kInk,
+            ),
           ),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios_rounded,
-          size: 16,
-          color: kAmberDeep,
-        ),
-        onTap: () {
+          trailing: const Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 16,
+            color: kAmberDeep,
+          ),
+          onTap: () {
           if (title == 'Rate your experience') {
             ExperienceReviewCard.showAsBottomSheet(context);
             return;
@@ -172,6 +182,8 @@ class AccountScreen extends StatelessWidget {
             nextScreen = const BookingsScreen();
           } else if (title == 'Account details') {
             nextScreen = AccountDetailsScreen(phoneNumber: phoneNumber);
+          } else if (title == 'Help & Support (FAQs)') {
+            nextScreen = const BookingSupportScreen();
           } else {
             nextScreen = const ContentHubScreen();
           }
@@ -182,8 +194,9 @@ class AccountScreen extends StatelessWidget {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSocialIcon(IconData icon) {
     return Container(

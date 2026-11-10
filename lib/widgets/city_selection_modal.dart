@@ -119,38 +119,41 @@ class _CitySelectionModalState extends State<CitySelectionModal> {
                       Divider(color: kInputBorder.withValues(alpha: 0.5)),
               itemBuilder: (context, index) {
                 final city = filteredCities[index];
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(vertical: 2),
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: kAmberSoft,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: kInputBorder),
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: kAmberSoft,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: kInputBorder),
+                      ),
+                      child: const Icon(
+                        Icons.location_city_rounded,
+                        color: kAmberDeep,
+                        size: 20,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.location_city_rounded,
+                    title: Text(
+                      city.name,
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.bold,
+                        color: kInk,
+                      ),
+                    ),
+                    subtitle: Text(
+                      city.state,
+                      style: GoogleFonts.outfit(fontSize: 12, color: kInkSoft),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
                       color: kAmberDeep,
                       size: 20,
                     ),
+                    onTap: () => Navigator.pop(context, city),
                   ),
-                  title: Text(
-                    city.name,
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      color: kInk,
-                    ),
-                  ),
-                  subtitle: Text(
-                    city.state,
-                    style: GoogleFonts.outfit(fontSize: 12, color: kInkSoft),
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right_rounded,
-                    color: kAmberDeep,
-                    size: 20,
-                  ),
-                  onTap: () => Navigator.pop(context, city),
                 );
               },
             ),

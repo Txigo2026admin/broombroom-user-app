@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'booking_review_screen.dart';
+import 'booking_support_screen.dart';
 import '../../data/services/car_service.dart';
 import '../../data/models/car_category.dart';
 import '../../data/services/distance_service.dart';
@@ -351,24 +352,27 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                     Expanded(
                       child: Row(
                         children: [
-                          Text(
-                            _redirectedToOutstation
-                                ? 'Outstation Oneway (Airport Distance > 25 km)'
-                                : (widget.isAirport
-                                    ? (widget.airportDirection ??
-                                        'Airport Transfer')
-                                    : (widget.isRental
-                                        ? 'Rental Package'
-                                        : (widget.isOneWay
-                                            ? 'One Way'
-                                            : 'Round Trip'))),
-                            style: GoogleFonts.outfit(
-                              color:
-                                  _redirectedToOutstation
-                                      ? const Color(0xFFC2410C)
-                                      : kAmberDeep,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: Text(
+                              _redirectedToOutstation
+                                  ? 'Outstation Oneway (Airport Distance > 25 km)'
+                                  : (widget.isAirport
+                                      ? (widget.airportDirection ??
+                                          'Airport Transfer')
+                                      : (widget.isRental
+                                          ? 'Rental Package'
+                                          : (widget.isOneWay
+                                              ? 'One Way'
+                                              : 'Round Trip'))),
+                              style: GoogleFonts.outfit(
+                                color:
+                                    _redirectedToOutstation
+                                        ? const Color(0xFFC2410C)
+                                        : kAmberDeep,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (widget.isRental) ...[
@@ -560,25 +564,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
 
           // Car Selection List with arrows & Main Car Details Card
           if (_isLoading)
-            const Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: kAmberDeep),
-                    SizedBox(height: 14),
-                    Text(
-                      'Finding best cabs for your route...',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: kInkSoft,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
+            _buildLoadingView()
           else if (_carCategories.isEmpty)
             Expanded(
               child: Center(
@@ -590,7 +576,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             )
           else ...[
             Container(
-              height: 132,
+              height: 86,
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
                 children: [
@@ -598,7 +584,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                   GestureDetector(
                     onTap: () {
                       _carListScrollController.animateTo(
-                        (_carListScrollController.offset - 90).clamp(
+                        (_carListScrollController.offset - 80).clamp(
                           0.0,
                           _carListScrollController.position.maxScrollExtent,
                         ),
@@ -607,7 +593,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       );
                     },
                     child: Container(
-                      width: 24,
+                      width: 20,
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.chevron_left_rounded,
@@ -630,11 +616,11 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                           onTap:
                               () => setState(() => _selectedCarIndex = index),
                           child: Container(
-                            width: 100,
+                            width: 76,
                             margin: const EdgeInsets.symmetric(horizontal: 2.5),
                             padding: const EdgeInsets.symmetric(
-                              vertical: 2,
-                              horizontal: 3,
+                              vertical: 4,
+                              horizontal: 2,
                             ),
                             decoration: BoxDecoration(
                               color:
@@ -668,33 +654,36 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                                 ),
                                 const SizedBox(height: 2),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 6,
-                                  ),
+                                  width: 54,
+                                  height: 34,
+                                  padding: const EdgeInsets.all(2.5),
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
+                                    borderRadius: BorderRadius.circular(8),
                                     color: kCardBg,
                                     border: Border.all(
                                       color:
                                           isSelected
                                               ? kAmberDeep
                                               : kInputBorder,
-                                      width: isSelected ? 2 : 1,
+                                      width: isSelected ? 1.8 : 1,
                                     ),
                                   ),
-                                  child: Image.asset(
-                                    _getCarImage(car.name),
-                                    width: 60,
-                                    height: 34,
-                                    fit: BoxFit.contain,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            const Icon(
-                                              Icons.directions_car,
-                                              size: 24,
-                                              color: kInkSoft,
-                                            ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.asset(
+                                      _getCarImage(
+                                        car.name,
+                                        seater: car.seater,
+                                      ),
+                                      fit: BoxFit.contain,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.directions_car,
+                                                size: 18,
+                                                color: kInkSoft,
+                                              ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -703,7 +692,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                                   child: Text(
                                     '₹ ${(_calculatedPrices[car.name] ?? car.baseFare).toInt()}',
                                     style: GoogleFonts.outfit(
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       fontWeight: FontWeight.bold,
                                       color: isSelected ? kAmberDeep : kInk,
                                     ),
@@ -720,7 +709,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                   GestureDetector(
                     onTap: () {
                       _carListScrollController.animateTo(
-                        (_carListScrollController.offset + 90).clamp(
+                        (_carListScrollController.offset + 80).clamp(
                           0.0,
                           _carListScrollController.position.maxScrollExtent,
                         ),
@@ -729,7 +718,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       );
                     },
                     child: Container(
-                      width: 24,
+                      width: 20,
                       alignment: Alignment.center,
                       child: const Icon(
                         Icons.chevron_right_rounded,
@@ -885,18 +874,26 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       ),
                     ),
                     // Actual price - BIG
-                    Text(
-                      '₹${(_calculatedPrices[car.name] ?? car.baseFare).toInt()}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: kAmberDeep,
-                        height: 1.05,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '₹${(_calculatedPrices[car.name] ?? car.baseFare).toInt()}',
+                        style: GoogleFonts.outfit(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: kAmberDeep,
+                          height: 1.05,
+                        ),
                       ),
                     ),
-                    Text(
-                      '+ ₹${((_calculatedPrices[car.name] ?? car.baseFare) * 0.05).toInt()} Taxes and Charges',
-                      style: GoogleFonts.outfit(color: kInkSoft, fontSize: 10),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '+ ₹${((_calculatedPrices[car.name] ?? car.baseFare) * 0.05).toInt()} Taxes and Charges',
+                        style: GoogleFonts.outfit(color: kInkSoft, fontSize: 10),
+                      ),
                     ),
                   ],
                 ),
@@ -907,25 +904,60 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                 flex: 4,
                 child: SizedBox(
                   height: 115,
-                  child: Transform.scale(
-                    scale: 1.35,
-                    alignment: Alignment.centerRight,
-                    child: Image.asset(
-                      _getCarImage(car.name),
-                      fit: BoxFit.contain,
-                      errorBuilder:
-                          (context, error, stackTrace) => Container(
-                            decoration: BoxDecoration(
-                              color: kInputBg,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.directions_car,
-                              color: kInkSoft,
-                              size: 48,
+                  child: Builder(
+                    builder: (context) {
+                      final bool isTempo =
+                          car.name.toLowerCase().contains('tempo') ||
+                          car.name.toLowerCase().contains('traveller') ||
+                          car.name.toLowerCase().contains('urbania') ||
+                          car.seater > 7;
+
+                      if (isTempo) {
+                        return Align(
+                          alignment: Alignment.centerRight,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              _getCarImage(car.name, seater: car.seater),
+                              fit: BoxFit.contain,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Container(
+                                    decoration: BoxDecoration(
+                                      color: kInputBg,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.airport_shuttle_rounded,
+                                      color: kInkSoft,
+                                      size: 44,
+                                    ),
+                                  ),
                             ),
                           ),
-                    ),
+                        );
+                      }
+
+                      return Transform.scale(
+                        scale: 1.15,
+                        alignment: Alignment.centerRight,
+                        child: Image.asset(
+                          _getCarImage(car.name, seater: car.seater),
+                          fit: BoxFit.contain,
+                          errorBuilder:
+                              (context, error, stackTrace) => Container(
+                                decoration: BoxDecoration(
+                                  color: kInputBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.directions_car,
+                                  color: kInkSoft,
+                                  size: 48,
+                                ),
+                              ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1020,7 +1052,14 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                             '₹ ${(_calculatedPrices[car.name] ?? car.baseFare).toInt()}',
                         phoneNumber: widget.phoneNumber,
                         petType: widget.petType,
-                        pricingDetails: _pricingDetails[car.name],
+                        pricingDetails: {
+                          ...?_pricingDetails[car.name],
+                          'includedKms': _includedKms[car.name],
+                          'perKmRate':
+                              _perKmRates[car.name] ?? car.perKmRate,
+                          'distance':
+                              _includedKms[car.name] ?? _distance,
+                        },
                         originalPrice: _originalPrices[car.name],
                       ),
                 ),
@@ -1052,7 +1091,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     );
   }
 
-  String _getCarImage(String category) {
+  String _getCarImage(String category, {int? seater}) {
     category = category.toLowerCase();
     if (category.contains('sedan')) {
       return 'assets/images/cab_sedan.png';
@@ -1068,13 +1107,16 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     if (category.contains('innova')) {
       return 'assets/images/cab_innova.png';
     }
-    if (category.contains('24') || category.contains('25')) {
+    if (seater == 24 ||
+        seater == 25 ||
+        category.contains('24') ||
+        category.contains('25')) {
       return 'assets/images/cab_tempo_24.png';
     }
-    if (category.contains('17')) {
+    if (seater == 17 || category.contains('17')) {
       return 'assets/images/cab_tempo_17.png';
     }
-    if (category.contains('13')) {
+    if (seater == 13 || category.contains('13')) {
       return 'assets/images/cab_tempo_13.png';
     }
     if (category.contains('urbania')) {
@@ -1082,7 +1124,8 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     }
     if (category.contains('traveller') ||
         category.contains('tempo') ||
-        category.contains('seater')) {
+        category.contains('seater') ||
+        (seater != null && seater > 7)) {
       return 'assets/images/cab_tempo_17.png';
     }
     if (category.contains('hatchback')) {
@@ -1174,8 +1217,11 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           const Icon(Icons.speed_rounded, size: 16, color: kAmberDeep),
           const SizedBox(width: 8),
           Expanded(
-            child: RichText(
-              text: TextSpan(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: RichText(
+                text: TextSpan(
                 children: [
                   TextSpan(
                     text: boldPart,
@@ -1205,7 +1251,8 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               ),
             ),
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
@@ -1244,9 +1291,17 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
 
           _buildInfoDivider(),
           Expanded(
-            child: _buildInfoItem(
-              Icons.support_agent_rounded,
-              '24x7\nCustomer Support',
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BookingSupportScreen()),
+                );
+              },
+              child: _buildInfoItem(
+                Icons.support_agent_rounded,
+                '24x7\nCustomer Support',
+              ),
             ),
           ),
         ],
@@ -1259,13 +1314,16 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
       children: [
         Icon(icon, color: kAmberDeep, size: 20),
         const SizedBox(height: 4),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            color: kInk,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: kInk,
+            ),
           ),
         ),
       ],
@@ -1314,27 +1372,39 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             padding: const EdgeInsets.all(4),
             tabs: const [
               Tab(
-                child: Text(
-                  'INCLUSIONS',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'INCLUSIONS',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               Tab(
-                child: Text(
-                  'EXCLUSIONS',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'EXCLUSIONS',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               Tab(
-                child: Text(
-                  'FACILITIES',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'FACILITIES',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               Tab(
-                child: Text(
-                  'T&C',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    'T&C',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -1375,7 +1445,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           150;
       final nightAllowance =
           (details?['nightAllowance'] as num?)?.toInt() ?? 250;
-      final threshold = (details?['threshold'] as num?)?.toInt() ?? 500;
       final activeTier =
           details?['tier']?.toString() ??
           (_distance <= 15 ? '0-15 km' : '15-25 km');
@@ -1387,6 +1456,15 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               Icons.local_gas_station_rounded,
               'Fixed Tier Charges ($activeTier)',
             ),
+            _buildTabDetailItem(
+              Icons.route_rounded,
+              'Total kms: $baseKms kms included',
+            ),
+            if (details?['extraKmRate'] != null)
+              _buildTabDetailItem(
+                Icons.currency_rupee_rounded,
+                'Extra km rate: ₹${(details!['extraKmRate'] as num).toInt()}/km',
+              ),
             _buildTabDetailItem(Icons.person_rounded, 'Driver Allowance'),
             _buildTabDetailItem(
               Icons.flight_land_rounded,
@@ -1441,10 +1519,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               Icons.nightlight_round,
               'Night driving allowance: ₹$nightAllowance/- (11 PM till 6 AM)',
             ),
-            _buildTabDetailItem(
-              Icons.payment_rounded,
-              'Threshold value: ₹$threshold to confirm booking',
-            ),
           ];
         default:
           return [];
@@ -1462,27 +1536,41 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             : _distance <= 200
             ? '151-200 km'
             : 'Upto 4000 km');
-    final billableKms =
-        (details?['billableKms'] as num?)?.toInt() ??
-        (_distance <= 50 ? 50 : _distance.toInt());
     final waitingCharge =
         (details?['waitingChargePerHour'] ?? details?['waitingCharge'] as num?)
             ?.toInt() ??
         150;
     final nightAllowance = (details?['nightAllowance'] as num?)?.toInt() ?? 250;
-    final threshold = (details?['threshold'] as num?)?.toInt() ?? 500;
 
     switch (_tabController.index) {
       case 0: // INCLUSIONS
+        final double dispKms =
+            currentCar != null
+                ? (_includedKms[currentCar.name] ?? _distance)
+                : _distance;
+        final int kmVal =
+            dispKms > 0 ? dispKms.toInt() : (widget.isOneWay ? 150 : 300);
+        final double dispRate =
+            currentCar != null
+                ? (_perKmRates[currentCar.name] ?? currentCar.perKmRate)
+                : 12.0;
+        final int rateVal =
+            currentCar != null
+                ? _getDefaultPerKmRate(currentCar.name, dispRate).toInt()
+                : dispRate.toInt();
+
         return [
           _buildTabDetailItem(Icons.local_gas_station_rounded, 'Fuel Charges'),
           _buildTabDetailItem(Icons.person_rounded, 'Driver Allowance'),
-          if (widget.isOneWay) ...[
-            _buildTabDetailItem(
-              Icons.speed_rounded,
-              'Base Distance Slab ($slab - billable $billableKms kms)',
-            ),
-          ] else ...[
+          _buildTabDetailItem(
+            Icons.route_rounded,
+            'Total kms: $kmVal kms included',
+          ),
+          _buildTabDetailItem(
+            Icons.currency_rupee_rounded,
+            'Fare rate: ₹$rateVal/km',
+          ),
+          if (!widget.isOneWay) ...[
             _buildTabDetailItem(
               Icons.speed_rounded,
               'Roundtrip Distance ($slab - ${_distance.toStringAsFixed(0)} kms)',
@@ -1517,10 +1605,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
         if (widget.isOneWay) {
           return [
             _buildTabDetailItem(
-              Icons.alt_route_rounded,
-              'Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km',
-            ),
-            _buildTabDetailItem(
               Icons.timer_outlined,
               'Waiting charges (after 60 mins of pickup time): ₹$waitingCharge/hour',
             ),
@@ -1528,20 +1612,12 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               Icons.nightlight_round,
               'Night driving allowances: ₹$nightAllowance/- (11 PM till 6 AM)',
             ),
-            _buildTabDetailItem(
-              Icons.payment_rounded,
-              'Threshold value: ₹$threshold to confirm booking',
-            ),
           ];
         }
         return [
           _buildTabDetailItem(
-            Icons.alt_route_rounded,
-            'Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km',
-          ),
-          _buildTabDetailItem(
             Icons.compare_arrows_rounded,
-            'Fare evaluates: Distance fare vs Total hours fare vs Threshold (higher applies)',
+            'Fare evaluates: Distance fare vs Total hours fare (higher applies)',
           ),
           _buildTabDetailItem(
             Icons.timer_outlined,
@@ -1550,10 +1626,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           _buildTabDetailItem(
             Icons.nightlight_round,
             'Night driving allowances: ₹$nightAllowance/- (11 PM till 6 AM)',
-          ),
-          _buildTabDetailItem(
-            Icons.payment_rounded,
-            'Threshold value: ₹$threshold to confirm booking',
           ),
         ];
       default:
@@ -1565,6 +1637,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: 6.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(5),
@@ -1587,6 +1660,90 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingView() {
+    return Expanded(
+      child: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Please wait',
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: kInk,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 230),
+                  child: Image.asset(
+                    'assets/images/loading_cab.gif',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'assets/images/loading_car_yellow.png',
+                        fit: BoxFit.contain,
+                        errorBuilder:
+                            (context, error, stackTrace) => const Icon(
+                              Icons.directions_car_rounded,
+                              size: 80,
+                              color: kAmberDeep,
+                            ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Looking for the best rates',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: kInk,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Finding reliable cabs at lowest prices...',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: kInkSoft,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: 200,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: kAmberSoft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: const LinearProgressIndicator(
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation<Color>(kAmberDeep),
+                      minHeight: 4.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

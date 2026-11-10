@@ -156,32 +156,38 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
           child: Row(
             children: [
-              // ── Gradient brand tile with car icon ─────────────
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.all(10),
+              // ── Brand Logo Tile ──────────────────────────────────
+              Container(
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  gradient: kPrimaryGradient,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: kAmberDeep.withValues(alpha: 0.35),
-                    width: 1,
-                  ),
-                  boxShadow: kButtonShadow(opacity: 0.35),
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kAmber.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  transitionBuilder:
-                      (child, anim) => ScaleTransition(
-                        scale: anim,
-                        child: FadeTransition(opacity: anim, child: child),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(13),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      decoration: BoxDecoration(
+                        gradient: kPrimaryGradient,
+                        borderRadius: BorderRadius.circular(13),
                       ),
-                  child: Icon(
-                    _getAppBarIcon(),
-                    key: ValueKey<int>(_selectedNavIndex),
-                    color: kInk,
-                    size: 22,
+                      child: Icon(
+                        _getAppBarIcon(),
+                        color: kInk,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ),
               ),

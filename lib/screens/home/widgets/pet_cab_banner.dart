@@ -35,17 +35,28 @@ class PetCabBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: kAmberSoft,
-                shape: BoxShape.circle,
-                border: Border.all(color: kInputBorder),
-              ),
-              child: const Icon(
-                Icons.pets_rounded,
-                color: kAmberDeep,
-                size: 20,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Image.asset(
+                  'assets/images/pet_cab_hero.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: kAmberSoft,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: kInputBorder),
+                    ),
+                    child: const Icon(
+                      Icons.pets_rounded,
+                      color: kAmberDeep,
+                      size: 20,
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 14),

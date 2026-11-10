@@ -12,10 +12,7 @@ import '../../../data/services/distance_service.dart';
 class AirportBookingCard extends StatefulWidget {
   final String? phoneNumber;
 
-  const AirportBookingCard({
-    super.key,
-    this.phoneNumber,
-  });
+  const AirportBookingCard({super.key, this.phoneNumber});
 
   @override
   State<AirportBookingCard> createState() => _AirportBookingCardState();
@@ -41,16 +38,25 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
   late String startDate;
   late String startTime;
 
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    int minute = now.minute;
-    int roundedMinute = ((minute + 14) ~/ 15) * 15;
-    final startDt = roundedMinute == 60
-        ? DateTime(now.year, now.month, now.day, now.hour + 1, 0)
-        : DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
-
+    final startDt = _getInitialStartTime();
     startDate = DateFormat('dd-MM-yyyy').format(startDt);
     startTime = DateFormat('hh:mm a').format(startDt);
   }
@@ -90,7 +96,9 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
   void _navigateToCabs() {
     if (_selectedAirport == null && _airportController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an airport from the search bar')),
+        const SnackBar(
+          content: Text('Please select an airport from the search bar'),
+        ),
       );
       return;
     }
@@ -114,16 +122,19 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
                 _selectedTerminal != 'Any Terminal')
             ? ' - $_selectedTerminal'
             : '';
-    final airportFormatted = _selectedAirport != null
-        ? '${_selectedAirport!.name} (${_selectedAirport!.code})$terminalSuffix'
-        : _airportController.text.trim();
+    final airportFormatted =
+        _selectedAirport != null
+            ? '${_selectedAirport!.name} (${_selectedAirport!.code})$terminalSuffix'
+            : _airportController.text.trim();
 
-    final fromLocation = isPickup
-        ? airportFormatted
-        : (_addressFullAddress ?? _addressController.text.trim());
-    final toLocation = isPickup
-        ? (_addressFullAddress ?? _addressController.text.trim())
-        : airportFormatted;
+    final fromLocation =
+        isPickup
+            ? airportFormatted
+            : (_addressFullAddress ?? _addressController.text.trim());
+    final toLocation =
+        isPickup
+            ? (_addressFullAddress ?? _addressController.text.trim())
+            : airportFormatted;
 
     final fromLat = isPickup ? _selectedAirport?.lat : _addressLat;
     final fromLng = isPickup ? _selectedAirport?.lon : _addressLng;
@@ -135,24 +146,25 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CabSelectionScreen(
-          from: fromLocation,
-          to: toLocation,
-          fromLat: fromLat,
-          fromLng: fromLng,
-          toLat: toLat,
-          toLng: toLng,
-          date: startDate,
-          time: startTime,
-          isOneWay: true,
-          isAirport: true,
-          initialDistance: _estimatedDistance,
-          airportDirection:
-              isPickup ? 'Pickup from airport' : 'Drop to airport',
-          airportTerminal: _selectedTerminal,
-          airportName: _selectedAirport?.name,
-          phoneNumber: widget.phoneNumber ?? '919243424225',
-        ),
+        builder:
+            (context) => CabSelectionScreen(
+              from: fromLocation,
+              to: toLocation,
+              fromLat: fromLat,
+              fromLng: fromLng,
+              toLat: toLat,
+              toLng: toLng,
+              date: startDate,
+              time: startTime,
+              isOneWay: true,
+              isAirport: true,
+              initialDistance: _estimatedDistance,
+              airportDirection:
+                  isPickup ? 'Pickup from airport' : 'Drop to airport',
+              airportTerminal: _selectedTerminal,
+              airportName: _selectedAirport?.name,
+              phoneNumber: widget.phoneNumber ?? '919243424225',
+            ),
       ),
     );
   }
@@ -170,7 +182,9 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: Row(
             children: [
               Container(
@@ -204,7 +218,10 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
             children: [
               Text(
                 'Type any terminal or gate for ${_selectedAirport?.name ?? "this airport"}:',
-                style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[700]),
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                ),
               ),
               const SizedBox(height: 14),
               TextField(
@@ -213,20 +230,36 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
                 textCapitalization: TextCapitalization.words,
                 decoration: InputDecoration(
                   hintText: 'e.g. Terminal 3, Terminal 1D, Cargo Gate',
-                  hintStyle: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[400]),
+                  hintStyle: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: Colors.grey[400],
+                  ),
                   filled: true,
                   fillColor: const Color(0xFFFFFDF5),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFFFD54F), width: 1.2),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFFFD54F),
+                      width: 1.2,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFFF8F00), width: 1.8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFFF8F00),
+                      width: 1.8,
+                    ),
                   ),
                 ),
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: kInk),
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kInk,
+                ),
                 onSubmitted: (val) {
                   final trimmed = val.trim();
                   if (trimmed.isNotEmpty) {
@@ -241,16 +274,24 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
               onPressed: () => Navigator.pop(ctx),
               child: Text(
                 'Cancel',
-                style: GoogleFonts.outfit(color: Colors.grey[600], fontWeight: FontWeight.w600),
+                style: GoogleFonts.outfit(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFB300),
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
               ),
               onPressed: () {
                 final trimmed = textController.text.trim();
@@ -295,7 +336,10 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
         children: [
           Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 6.5,
+              ),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFFF8E7), Color(0xFFFFF0C2)],
@@ -385,7 +429,8 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
               setState(() {
                 _selectedAirport = airport;
                 _customTerminals.clear();
-                _selectedTerminal = defaultTerminal ??
+                _selectedTerminal =
+                    defaultTerminal ??
                     (airport.terminals.isNotEmpty
                         ? airport.terminals.first
                         : 'Terminal 1');
@@ -522,10 +567,11 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
 
   // Exact matching design from the user's uploaded image
   Widget _buildTerminalSelector() {
-    final baseTerminals = (_selectedAirport?.terminals != null &&
-            _selectedAirport!.terminals.isNotEmpty)
-        ? _selectedAirport!.terminals
-        : ['Terminal 1', 'Terminal 2'];
+    final baseTerminals =
+        (_selectedAirport?.terminals != null &&
+                _selectedAirport!.terminals.isNotEmpty)
+            ? _selectedAirport!.terminals
+            : ['Terminal 1', 'Terminal 2'];
 
     // Combine airport terminals, any custom entered terminals, plus 'Any Terminal'
     final List<String> terminals = [];
@@ -585,28 +631,36 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
                         vertical: 9,
                       ),
                       decoration: BoxDecoration(
-                        gradient: isSelected
-                            ? const LinearGradient(
-                                colors: [Color(0xFFFFB300), Color(0xFFFF8F00)],
-                              )
-                            : null,
+                        gradient:
+                            isSelected
+                                ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFFB300),
+                                    Color(0xFFFF8F00),
+                                  ],
+                                )
+                                : null,
                         color: isSelected ? null : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFFFF8F00)
-                              : const Color(0xFFFFD54F),
+                          color:
+                              isSelected
+                                  ? const Color(0xFFFF8F00)
+                                  : const Color(0xFFFFD54F),
                           width: 1,
                         ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFFFF8F00).withValues(alpha: 0.25),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : [],
+                        boxShadow:
+                            isSelected
+                                ? [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFFFF8F00,
+                                    ).withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                                : [],
                       ),
                       child: Text(
                         terminal,
@@ -614,7 +668,10 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
                           fontSize: 13,
                           fontWeight:
                               isSelected ? FontWeight.bold : FontWeight.w500,
-                          color: isSelected ? Colors.black : const Color(0xFF4A4A4A),
+                          color:
+                              isSelected
+                                  ? Colors.black
+                                  : const Color(0xFF4A4A4A),
                         ),
                       ),
                     ),
@@ -673,22 +730,22 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            gradient: isSelected
-                ? const LinearGradient(
-                    colors: [Color(0xFFFFD54F), kAmber],
-                  )
-                : null,
+            gradient:
+                isSelected
+                    ? const LinearGradient(colors: [Color(0xFFFFD54F), kAmber])
+                    : null,
             color: isSelected ? null : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: kAmber.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : [],
+            boxShadow:
+                isSelected
+                    ? [
+                      BoxShadow(
+                        color: kAmber.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                    : [],
           ),
           alignment: Alignment.center,
           child: Column(
@@ -705,9 +762,10 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
               Text(
                 subText,
                 style: GoogleFonts.outfit(
-                  color: isSelected
-                      ? kInk.withValues(alpha: 0.7)
-                      : kInkSoft.withValues(alpha: 0.7),
+                  color:
+                      isSelected
+                          ? kInk.withValues(alpha: 0.7)
+                          : kInkSoft.withValues(alpha: 0.7),
                   fontSize: 9,
                   fontWeight: FontWeight.w500,
                 ),
@@ -730,11 +788,13 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
       onTap: () async {
         final result = await showDialog<Map<String, dynamic>>(
           context: context,
-          builder: (context) => DateTimePickerDialog(
-            label: label,
-            initialDate: date,
-            initialTime: subText,
-          ),
+          builder:
+              (context) => DateTimePickerDialog(
+                label: label,
+                initialDate: date,
+                initialTime: subText,
+                minDateTime: _getInitialStartTime(),
+              ),
         );
         if (result != null) {
           setState(() {

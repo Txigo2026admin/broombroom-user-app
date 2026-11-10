@@ -23,16 +23,25 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
   late String startDate;
   late String startTime;
 
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    int minute = now.minute;
-    int roundedMinute = ((minute + 14) ~/ 15) * 15;
-    final startDt = roundedMinute == 60
-        ? DateTime(now.year, now.month, now.day, now.hour + 1, 0)
-        : DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
-
+    final startDt = _getInitialStartTime();
     startDate = DateFormat('dd-MM-yyyy').format(startDt);
     startTime = DateFormat('hh:mm a').format(startDt);
   }
@@ -305,6 +314,7 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
                 label: label,
                 initialDate: date,
                 initialTime: subText,
+                minDateTime: _getInitialStartTime(),
               ),
         );
         if (result != null) {

@@ -1275,6 +1275,46 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   }
 
   Widget _buildInclusionsExclusionsSection() {
+    final distance =
+        widget.pricingDetails?['includedKms'] ??
+        widget.pricingDetails?['billableKms'] ??
+        widget.pricingDetails?['distance'];
+
+    String totalKmsStr = '150 kms';
+    if (widget.isRental && widget.rentalPackage != null) {
+      totalKmsStr = widget.rentalPackage!;
+    } else if (distance != null) {
+      final km = double.tryParse(distance.toString());
+      if (km != null && km > 0) {
+        totalKmsStr = '${km.toInt()} kms';
+      }
+    } else {
+      totalKmsStr = widget.isOneWay ? '150 kms' : '300 kms';
+    }
+
+    final rawRate =
+        widget.pricingDetails?['perKmRate'] ??
+        widget.pricingDetails?['ratePerKm'] ??
+        widget.pricingDetails?['extraKmRate'] ??
+        widget.pricingDetails?['perKm'];
+    int perKmVal = 0;
+    if (rawRate != null) {
+      perKmVal = (double.tryParse(rawRate.toString()) ?? 0).toInt();
+    }
+    if (perKmVal <= 0) {
+      final lowerName = widget.carName.toLowerCase();
+      if (lowerName.contains('suv') ||
+          lowerName.contains('innova') ||
+          lowerName.contains('ertiga')) {
+        perKmVal = 18;
+      } else if (lowerName.contains('tempo') ||
+          lowerName.contains('urbania')) {
+        perKmVal = 26;
+      } else {
+        perKmVal = 12;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1314,21 +1354,50 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          _buildInclusionPoint(
-            Icons.check_circle_rounded,
-            widget.isAirport
-                ? 'Fixed Tier Charges (${widget.pricingDetails?['tier'] ?? 'Airport Transfer'})'
-                : 'Base Fare & Fuel Charges',
-            true,
-          ),
-          _buildInclusionPoint(
-            Icons.check_circle_rounded,
-            widget.isAirport
-                ? 'Driver Allowance & Airport Assistance'
-                : 'Driver Allowance',
-            true,
-          ),
+          const SizedBox(height: 10),
+          if (widget.isAirport) ...[
+            _buildInclusionPoint(
+              Icons.local_gas_station_rounded,
+              'Fixed Tier Charges (${widget.pricingDetails?['tier'] ?? 'Airport Transfer'})',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.route_rounded,
+              'Total kms: $totalKmsStr included',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.currency_rupee_rounded,
+              'Extra km rate: ₹$perKmVal/km',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.flight_land_rounded,
+              'Driver Allowance & Airport Assistance Included',
+              true,
+            ),
+          ] else ...[
+            _buildInclusionPoint(
+              Icons.local_gas_station_rounded,
+              'Base Fare & Fuel Charges Included',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.person_rounded,
+              'Driver Allowance Included',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.route_rounded,
+              'Total kms: $totalKmsStr included',
+              true,
+            ),
+            _buildInclusionPoint(
+              Icons.currency_rupee_rounded,
+              'Fare rate: ₹$perKmVal/km',
+              true,
+            ),
+          ],
           const SizedBox(height: 8),
           Divider(color: kInputBorder.withValues(alpha: 0.6)),
           const SizedBox(height: 8),
@@ -1360,47 +1429,31 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          _buildInclusionPoint(Icons.cancel_rounded, 'Toll / State Tax', false),
-          _buildInclusionPoint(Icons.cancel_rounded, 'GST (5%)', false),
+          const SizedBox(height: 10),
           _buildInclusionPoint(
-            Icons.cancel_rounded,
+            Icons.receipt_long_rounded,
+            'Toll / State Tax',
+            false,
+          ),
+          _buildInclusionPoint(
+            Icons.account_balance_wallet_rounded,
+            'GST (5%)',
+            false,
+          ),
+          _buildInclusionPoint(
+            Icons.local_parking_rounded,
             'Parking Charges (as per actuals)',
             false,
           ),
           _buildInclusionPoint(
-            Icons.cancel_rounded,
+            Icons.timer_outlined,
             'Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour',
             false,
           ),
           _buildInclusionPoint(
-            Icons.cancel_rounded,
+            Icons.nightlight_round,
             'Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am)',
             false,
-          ),
-          const SizedBox(height: 6),
-          Divider(color: kInputBorder.withValues(alpha: 0.6)),
-          const SizedBox(height: 6),
-          Text(
-            'Terms and Conditions',
-            style: GoogleFonts.outfit(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: kInk,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            widget.isAirport
-                ? '• 0-15 km: fixed charges of ₹${(widget.pricingDetails?['fare0to15'] ?? widget.pricingDetails?['baseFare'] ?? 750).toInt()}.\n• 15-25 km: fixed charges of ₹${(widget.pricingDetails?['fare15to25'] ?? 1050).toInt()}.\n• Beyond 25 km: Airport flat transfer is redirected to Outstation one-way rates.\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
-                : widget.isOneWay
-                ? '• Distance Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Billable distance drops into active bracket (e.g. 30 km drops to 0-50 km billable; 200-4000 km charges apply per total km).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
-                : '• Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Price evaluates: Distance fare vs Total hours fare vs Threshold value (higher applies).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.',
-            style: GoogleFonts.outfit(
-              fontSize: 11,
-              color: kInkSoft,
-              height: 1.4,
-            ),
           ),
         ],
       ),
@@ -1408,21 +1461,39 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   }
 
   Widget _buildInclusionPoint(IconData icon, String text, bool isIncluded) {
+    final color =
+        isIncluded ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+    final bg =
+        isIncluded ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
+      padding: const EdgeInsets.only(bottom: 7.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 15,
-            color: isIncluded ? Colors.green : Colors.red.shade400,
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.all(4.5),
+            decoration: BoxDecoration(
+              color: bg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 13,
+              color: color,
+            ),
           ),
-          const SizedBox(width: 7),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.outfit(fontSize: 12, color: kInk),
-              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: kInk,
+                height: 1.3,
+              ),
             ),
           ),
         ],

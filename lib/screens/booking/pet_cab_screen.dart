@@ -24,7 +24,8 @@ class _PetCabScreenState extends State<PetCabScreen> {
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
   final TextEditingController _airportController = TextEditingController();
-  final TextEditingController _airportAddressController = TextEditingController();
+  final TextEditingController _airportAddressController =
+      TextEditingController();
   final TextEditingController _rentalCityController = TextEditingController();
 
   final FocusNode _fromFocusNode = FocusNode();
@@ -66,12 +67,17 @@ class _PetCabScreenState extends State<PetCabScreen> {
 
   static DateTime _getInitialStartTime() {
     final now = DateTime.now();
-    int minute = now.minute;
-    int roundedMinute = ((minute + 14) ~/ 15) * 15;
-    if (roundedMinute == 60) {
-      return DateTime(now.year, now.month, now.day, now.hour + 1, 0);
-    }
-    return DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
   }
 
   static DateTime _parseDateTime(String dateStr, String timeStr) {
@@ -136,25 +142,28 @@ class _PetCabScreenState extends State<PetCabScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CabSelectionScreen(
-            from: _rentalCityFullAddress ?? _rentalCityController.text.trim(),
-            to: 'Local (${pkg['time']})',
-            fromLat: _rentalCityLat,
-            fromLng: _rentalCityLng,
-            date: startDate,
-            time: startTime,
-            isOneWay: true,
-            isRental: true,
-            packageHours: pkg['hours'] as int,
-            includedKms: pkg['kms'] as int,
-            phoneNumber: widget.phoneNumber,
-            petType: _selectedPet,
-          ),
+          builder:
+              (context) => CabSelectionScreen(
+                from:
+                    _rentalCityFullAddress ?? _rentalCityController.text.trim(),
+                to: 'Local (${pkg['time']})',
+                fromLat: _rentalCityLat,
+                fromLng: _rentalCityLng,
+                date: startDate,
+                time: startTime,
+                isOneWay: true,
+                isRental: true,
+                packageHours: pkg['hours'] as int,
+                includedKms: pkg['kms'] as int,
+                phoneNumber: widget.phoneNumber,
+                petType: _selectedPet,
+              ),
         ),
       );
     } else if (_selectedServiceIndex == 3) {
       // Airport Transfer
-      if (_airportController.text.trim().isEmpty || _airportAddressController.text.trim().isEmpty) {
+      if (_airportController.text.trim().isEmpty ||
+          _airportAddressController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter airport and address')),
         );
@@ -163,51 +172,62 @@ class _PetCabScreenState extends State<PetCabScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CabSelectionScreen(
-            from: _isAirportPickup
-                ? (_airportFullAddress ?? _airportController.text.trim())
-                : (_airportAddressFullAddress ?? _airportAddressController.text.trim()),
-            to: _isAirportPickup
-                ? (_airportAddressFullAddress ?? _airportAddressController.text.trim())
-                : (_airportFullAddress ?? _airportController.text.trim()),
-            fromLat: _isAirportPickup ? _airportLat : _airportAddressLat,
-            fromLng: _isAirportPickup ? _airportLng : _airportAddressLng,
-            toLat: _isAirportPickup ? _airportAddressLat : _airportLat,
-            toLng: _isAirportPickup ? _airportAddressLng : _airportLng,
-            date: startDate,
-            time: startTime,
-            isOneWay: true,
-            phoneNumber: widget.phoneNumber,
-            petType: _selectedPet,
-          ),
+          builder:
+              (context) => CabSelectionScreen(
+                from:
+                    _isAirportPickup
+                        ? (_airportFullAddress ??
+                            _airportController.text.trim())
+                        : (_airportAddressFullAddress ??
+                            _airportAddressController.text.trim()),
+                to:
+                    _isAirportPickup
+                        ? (_airportAddressFullAddress ??
+                            _airportAddressController.text.trim())
+                        : (_airportFullAddress ??
+                            _airportController.text.trim()),
+                fromLat: _isAirportPickup ? _airportLat : _airportAddressLat,
+                fromLng: _isAirportPickup ? _airportLng : _airportAddressLng,
+                toLat: _isAirportPickup ? _airportAddressLat : _airportLat,
+                toLng: _isAirportPickup ? _airportAddressLng : _airportLng,
+                date: startDate,
+                time: startTime,
+                isOneWay: true,
+                phoneNumber: widget.phoneNumber,
+                petType: _selectedPet,
+              ),
         ),
       );
     } else {
       // One Way or Round Trip
-      if (_fromController.text.trim().isEmpty || _toController.text.trim().isEmpty) {
+      if (_fromController.text.trim().isEmpty ||
+          _toController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter pickup and destination cities')),
+          const SnackBar(
+            content: Text('Please enter pickup and destination cities'),
+          ),
         );
         return;
       }
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CabSelectionScreen(
-            from: _fromFullAddress ?? _fromController.text.trim(),
-            to: _toFullAddress ?? _toController.text.trim(),
-            fromLat: _fromLat,
-            fromLng: _fromLng,
-            toLat: _toLat,
-            toLng: _toLng,
-            date: startDate,
-            time: startTime,
-            returnDate: _selectedServiceIndex == 1 ? endDate : null,
-            returnTime: _selectedServiceIndex == 1 ? endTime : null,
-            isOneWay: _selectedServiceIndex == 0,
-            phoneNumber: widget.phoneNumber,
-            petType: _selectedPet,
-          ),
+          builder:
+              (context) => CabSelectionScreen(
+                from: _fromFullAddress ?? _fromController.text.trim(),
+                to: _toFullAddress ?? _toController.text.trim(),
+                fromLat: _fromLat,
+                fromLng: _fromLng,
+                toLat: _toLat,
+                toLng: _toLng,
+                date: startDate,
+                time: startTime,
+                returnDate: _selectedServiceIndex == 1 ? endDate : null,
+                returnTime: _selectedServiceIndex == 1 ? endTime : null,
+                isOneWay: _selectedServiceIndex == 0,
+                phoneNumber: widget.phoneNumber,
+                petType: _selectedPet,
+              ),
         ),
       );
     }
@@ -222,30 +242,30 @@ class _PetCabScreenState extends State<PetCabScreen> {
           _buildSliverAppBar(),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Travel With Your Furry Friends',
                     style: GoogleFonts.outfit(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: kInk,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Sanitized cabs, pet-friendly pilots, and extra care for your pets.',
-                    style: GoogleFonts.outfit(fontSize: 13.5, color: kInkSoft),
+                    style: GoogleFonts.outfit(fontSize: 13, color: kInkSoft),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 14),
                   _buildBookingCard(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
                   _buildFeaturesSection(),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
                   _buildPetSelection(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   _buildBookingButton(),
                   const SizedBox(height: 30),
                 ],
@@ -268,7 +288,7 @@ class _PetCabScreenState extends State<PetCabScreen> {
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 240,
+      expandedHeight: 140,
       pinned: true,
       backgroundColor: kAmberDeep,
       leading: IconButton(
@@ -335,7 +355,8 @@ class _PetCabScreenState extends State<PetCabScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => HomeScreen(phoneNumber: widget.phoneNumber),
+                  builder:
+                      (context) => HomeScreen(phoneNumber: widget.phoneNumber),
                 ),
                 (route) => false,
               );
@@ -376,18 +397,68 @@ class _PetCabScreenState extends State<PetCabScreen> {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset('assets/images/pet_cab_hero.png', fit: BoxFit.cover),
+            Image.asset(
+              'assets/images/pet_cab_hero.png',
+              fit: BoxFit.cover,
+              alignment: const Alignment(0.0, -0.65),
+              errorBuilder: (context, error, stackTrace) {
+                // Shows in the `flutter run` console — fastest way to find the
+                // real path/filename mismatch when the image doesn't load.
+                debugPrint('⚠️ pet_cab_hero.png failed to load: $error');
+                return Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+                    ),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.pets_rounded,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Pet Friendly Cabs',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Sanitized rides for your furry friends',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.25),
+                    Colors.black.withValues(alpha: 0.2),
                     Colors.transparent,
+                    kBgMid.withValues(alpha: 0.7),
                     kBgMid,
                   ],
-                  stops: const [0, 0.5, 1],
+                  stops: const [0.0, 0.55, 0.88, 1.0],
                 ),
               ),
             ),
@@ -410,7 +481,10 @@ class _PetCabScreenState extends State<PetCabScreen> {
         children: [
           Center(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 6.5,
+              ),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFFFF8E7), Color(0xFFFFF0C2)],
@@ -513,15 +587,16 @@ class _PetCabScreenState extends State<PetCabScreen> {
                 decoration: BoxDecoration(
                   gradient: isSelected ? kPrimaryGradient : null,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: kAmber.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
+                  boxShadow:
+                      isSelected
+                          ? [
+                            BoxShadow(
+                              color: kAmber.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                          : [],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -537,7 +612,8 @@ class _PetCabScreenState extends State<PetCabScreen> {
                       maxLines: 1,
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w600,
                         color: isSelected ? kInk : kInkSoft,
                         letterSpacing: 0.3,
                       ),
@@ -569,8 +645,12 @@ class _PetCabScreenState extends State<PetCabScreen> {
                   focusNode: _fromFocusNode,
                   onCitySelected: (city) {
                     _fromLat = double.tryParse(city['lat']?.toString() ?? '');
-                    _fromLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-                    _fromFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+                    _fromLng = double.tryParse(
+                      (city['lon'] ?? city['lng'])?.toString() ?? '',
+                    );
+                    _fromFullAddress =
+                        (city['display_name'] ?? city['displayName'])
+                            ?.toString();
                     if (_toController.text.trim().isEmpty) {
                       _toFocusNode.requestFocus();
                     }
@@ -590,8 +670,12 @@ class _PetCabScreenState extends State<PetCabScreen> {
                   focusNode: _toFocusNode,
                   onCitySelected: (city) {
                     _toLat = double.tryParse(city['lat']?.toString() ?? '');
-                    _toLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-                    _toFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+                    _toLng = double.tryParse(
+                      (city['lon'] ?? city['lng'])?.toString() ?? '',
+                    );
+                    _toFullAddress =
+                        (city['display_name'] ?? city['displayName'])
+                            ?.toString();
                     if (_fromController.text.trim().isEmpty) {
                       _fromFocusNode.requestFocus();
                     }
@@ -635,7 +719,11 @@ class _PetCabScreenState extends State<PetCabScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.swap_vert_rounded, color: kAmberDeep, size: 18),
+                  child: const Icon(
+                    Icons.swap_vert_rounded,
+                    color: kAmberDeep,
+                    size: 18,
+                  ),
                 ),
               ),
             ),
@@ -658,9 +746,14 @@ class _PetCabScreenState extends State<PetCabScreen> {
                         startDate = res['displayDate'] ?? res['date'];
                         startTime = res['time'];
 
-                        final currentStart = _parseDateTime(startDate, startTime);
+                        final currentStart = _parseDateTime(
+                          startDate,
+                          startTime,
+                        );
                         final currentEnd = _parseDateTime(endDate, endTime);
-                        final minEnd = currentStart.add(const Duration(hours: 3));
+                        final minEnd = currentStart.add(
+                          const Duration(hours: 3),
+                        );
 
                         if (currentEnd.isBefore(minEnd)) {
                           endDate = DateFormat('dd-MM-yyyy').format(minEnd);
@@ -669,6 +762,7 @@ class _PetCabScreenState extends State<PetCabScreen> {
                       });
                     }
                   },
+                  minDateTime: _getInitialStartTime(),
                 ),
               ),
               if (_selectedServiceIndex == 1) ...[
@@ -684,9 +778,17 @@ class _PetCabScreenState extends State<PetCabScreen> {
                         final pickedDate = res['displayDate'] ?? res['date'];
                         final pickedTime = res['time'];
 
-                        final currentStart = _parseDateTime(startDate, startTime);
-                        final pickedEnd = _parseDateTime(pickedDate, pickedTime);
-                        final minEnd = currentStart.add(const Duration(hours: 3));
+                        final currentStart = _parseDateTime(
+                          startDate,
+                          startTime,
+                        );
+                        final pickedEnd = _parseDateTime(
+                          pickedDate,
+                          pickedTime,
+                        );
+                        final minEnd = currentStart.add(
+                          const Duration(hours: 3),
+                        );
 
                         if (pickedEnd.isBefore(minEnd)) {
                           setState(() {
@@ -711,7 +813,10 @@ class _PetCabScreenState extends State<PetCabScreen> {
                         }
                       }
                     },
-                    minDateTime: _parseDateTime(startDate, startTime).add(const Duration(hours: 3)),
+                    minDateTime: _parseDateTime(
+                      startDate,
+                      startTime,
+                    ).add(const Duration(hours: 3)),
                   ),
                 ),
               ],
@@ -746,15 +851,16 @@ class _PetCabScreenState extends State<PetCabScreen> {
                     decoration: BoxDecoration(
                       gradient: isSelected ? kPrimaryGradient : null,
                       borderRadius: BorderRadius.circular(10),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: kAmber.withValues(alpha: 0.3),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ]
-                          : [],
+                      boxShadow:
+                          isSelected
+                              ? [
+                                BoxShadow(
+                                  color: kAmber.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                              : [],
                     ),
                     alignment: Alignment.center,
                     child: Column(
@@ -771,9 +877,10 @@ class _PetCabScreenState extends State<PetCabScreen> {
                         Text(
                           _rentalPackages[index]['dist'].toString(),
                           style: GoogleFonts.outfit(
-                            color: isSelected
-                                ? kInk.withValues(alpha: 0.75)
-                                : kInkSoft.withValues(alpha: 0.75),
+                            color:
+                                isSelected
+                                    ? kInk.withValues(alpha: 0.75)
+                                    : kInkSoft.withValues(alpha: 0.75),
                             fontSize: 9,
                             fontWeight: FontWeight.w500,
                           ),
@@ -794,8 +901,11 @@ class _PetCabScreenState extends State<PetCabScreen> {
           controller: _rentalCityController,
           onCitySelected: (city) {
             _rentalCityLat = double.tryParse(city['lat']?.toString() ?? '');
-            _rentalCityLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-            _rentalCityFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+            _rentalCityLng = double.tryParse(
+              (city['lon'] ?? city['lng'])?.toString() ?? '',
+            );
+            _rentalCityFullAddress =
+                (city['display_name'] ?? city['displayName'])?.toString();
           },
           onChanged: (_) {
             _rentalCityLat = null;
@@ -804,20 +914,14 @@ class _PetCabScreenState extends State<PetCabScreen> {
           },
         ),
         const SizedBox(height: 10),
-        _buildTripDateInput(
-          context,
-          'TRIP START',
-          startDate,
-          startTime,
-          (res) {
-            if (res != null) {
-              setState(() {
-                startDate = res['displayDate'] ?? res['date'];
-                startTime = res['time'];
-              });
-            }
-          },
-        ),
+        _buildTripDateInput(context, 'TRIP START', startDate, startTime, (res) {
+          if (res != null) {
+            setState(() {
+              startDate = res['displayDate'] ?? res['date'];
+              startTime = res['time'];
+            });
+          }
+        }, minDateTime: _getInitialStartTime()),
       ],
     );
   }
@@ -837,7 +941,11 @@ class _PetCabScreenState extends State<PetCabScreen> {
           ),
           child: Row(
             children: [
-              _buildAirportDirectionButton(true, 'PICKUP', 'Pickup from Airport'),
+              _buildAirportDirectionButton(
+                true,
+                'PICKUP',
+                'Pickup from Airport',
+              ),
               _buildAirportDirectionButton(false, 'DROP', 'Drop to Airport'),
             ],
           ),
@@ -851,8 +959,11 @@ class _PetCabScreenState extends State<PetCabScreen> {
           focusNode: _airportFocusNode,
           onCitySelected: (city) {
             _airportLat = double.tryParse(city['lat']?.toString() ?? '');
-            _airportLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-            _airportFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+            _airportLng = double.tryParse(
+              (city['lon'] ?? city['lng'])?.toString() ?? '',
+            );
+            _airportFullAddress =
+                (city['display_name'] ?? city['displayName'])?.toString();
             if (_airportAddressController.text.trim().isEmpty) {
               _airportAddressFocusNode.requestFocus();
             }
@@ -872,8 +983,11 @@ class _PetCabScreenState extends State<PetCabScreen> {
           focusNode: _airportAddressFocusNode,
           onCitySelected: (city) {
             _airportAddressLat = double.tryParse(city['lat']?.toString() ?? '');
-            _airportAddressLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-            _airportAddressFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+            _airportAddressLng = double.tryParse(
+              (city['lon'] ?? city['lng'])?.toString() ?? '',
+            );
+            _airportAddressFullAddress =
+                (city['display_name'] ?? city['displayName'])?.toString();
             if (_airportController.text.trim().isEmpty) {
               _airportFocusNode.requestFocus();
             }
@@ -885,25 +999,23 @@ class _PetCabScreenState extends State<PetCabScreen> {
           },
         ),
         const SizedBox(height: 8),
-        _buildTripDateInput(
-          context,
-          'TRIP START',
-          startDate,
-          startTime,
-          (res) {
-            if (res != null) {
-              setState(() {
-                startDate = res['displayDate'] ?? res['date'];
-                startTime = res['time'];
-              });
-            }
-          },
-        ),
+        _buildTripDateInput(context, 'TRIP START', startDate, startTime, (res) {
+          if (res != null) {
+            setState(() {
+              startDate = res['displayDate'] ?? res['date'];
+              startTime = res['time'];
+            });
+          }
+        }, minDateTime: _getInitialStartTime()),
       ],
     );
   }
 
-  Widget _buildAirportDirectionButton(bool value, String title, String subText) {
+  Widget _buildAirportDirectionButton(
+    bool value,
+    String title,
+    String subText,
+  ) {
     final isSelected = _isAirportPickup == value;
     return Expanded(
       child: GestureDetector(
@@ -913,15 +1025,16 @@ class _PetCabScreenState extends State<PetCabScreen> {
           decoration: BoxDecoration(
             gradient: isSelected ? kPrimaryGradient : null,
             borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: kAmber.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : [],
+            boxShadow:
+                isSelected
+                    ? [
+                      BoxShadow(
+                        color: kAmber.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                    : [],
           ),
           alignment: Alignment.center,
           child: Text(

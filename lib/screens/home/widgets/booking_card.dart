@@ -60,8 +60,10 @@ class _BookingCardState extends State<BookingCard> {
     final startDt = _getInitialStartTime();
     final endDt = startDt.add(const Duration(hours: 3));
 
-    startDate = widget.initialStartDate ?? DateFormat('dd-MM-yyyy').format(startDt);
-    startTime = widget.initialStartTime ?? DateFormat('hh:mm a').format(startDt);
+    startDate =
+        widget.initialStartDate ?? DateFormat('dd-MM-yyyy').format(startDt);
+    startTime =
+        widget.initialStartTime ?? DateFormat('hh:mm a').format(startDt);
 
     endDate = DateFormat('dd-MM-yyyy').format(endDt);
     endTime = DateFormat('hh:mm a').format(endDt);
@@ -83,7 +85,8 @@ class _BookingCardState extends State<BookingCard> {
   @override
   void didUpdateWidget(BookingCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialFrom != null && widget.initialFrom != oldWidget.initialFrom) {
+    if (widget.initialFrom != null &&
+        widget.initialFrom != oldWidget.initialFrom) {
       _fromController.text = widget.initialFrom!;
       _fromFullAddress = widget.initialFrom;
       _fromLat = widget.initialFromLat;
@@ -95,22 +98,29 @@ class _BookingCardState extends State<BookingCard> {
       _toLat = widget.initialToLat;
       _toLng = widget.initialToLng;
     }
-    if (widget.initialStartDate != null && widget.initialStartDate != oldWidget.initialStartDate) {
+    if (widget.initialStartDate != null &&
+        widget.initialStartDate != oldWidget.initialStartDate) {
       startDate = widget.initialStartDate!;
     }
-    if (widget.initialStartTime != null && widget.initialStartTime != oldWidget.initialStartTime) {
+    if (widget.initialStartTime != null &&
+        widget.initialStartTime != oldWidget.initialStartTime) {
       startTime = widget.initialStartTime!;
     }
   }
 
   static DateTime _getInitialStartTime() {
     final now = DateTime.now();
-    int minute = now.minute;
-    int roundedMinute = ((minute + 14) ~/ 15) * 15;
-    if (roundedMinute == 60) {
-      return DateTime(now.year, now.month, now.day, now.hour + 1, 0);
-    }
-    return DateTime(now.year, now.month, now.day, now.hour, roundedMinute);
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
   }
 
   static DateTime _parseDateTime(String dateStr, String timeStr) {
@@ -232,11 +242,7 @@ class _BookingCardState extends State<BookingCard> {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(
-              Icons.verified_rounded,
-              color: kAmberDeep,
-              size: 14,
-            ),
+            const Icon(Icons.verified_rounded, color: kAmberDeep, size: 14),
           ],
         ),
       ),
@@ -321,7 +327,8 @@ class _BookingCardState extends State<BookingCard> {
   }
 
   void _navigateToCabs() {
-    if (_fromController.text.trim().isEmpty || _toController.text.trim().isEmpty) {
+    if (_fromController.text.trim().isEmpty ||
+        _toController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter both pickup and destination cities'),
@@ -366,8 +373,11 @@ class _BookingCardState extends State<BookingCard> {
               focusNode: _fromFocusNode,
               onCitySelected: (city) {
                 _fromLat = double.tryParse(city['lat']?.toString() ?? '');
-                _fromLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-                _fromFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+                _fromLng = double.tryParse(
+                  (city['lon'] ?? city['lng'])?.toString() ?? '',
+                );
+                _fromFullAddress =
+                    (city['display_name'] ?? city['displayName'])?.toString();
                 if (_toController.text.trim().isEmpty) {
                   _toFocusNode.requestFocus();
                 }
@@ -387,8 +397,11 @@ class _BookingCardState extends State<BookingCard> {
               focusNode: _toFocusNode,
               onCitySelected: (city) {
                 _toLat = double.tryParse(city['lat']?.toString() ?? '');
-                _toLng = double.tryParse((city['lon'] ?? city['lng'])?.toString() ?? '');
-                _toFullAddress = (city['display_name'] ?? city['displayName'])?.toString();
+                _toLng = double.tryParse(
+                  (city['lon'] ?? city['lng'])?.toString() ?? '',
+                );
+                _toFullAddress =
+                    (city['display_name'] ?? city['displayName'])?.toString();
                 if (_fromController.text.trim().isEmpty) {
                   _fromFocusNode.requestFocus();
                 }
@@ -531,6 +544,7 @@ class _BookingCardState extends State<BookingCard> {
                   });
                 }
               },
+              minDateTime: _getInitialStartTime(),
             ),
           ),
           if (!widget.isOneWay) ...[
@@ -573,7 +587,10 @@ class _BookingCardState extends State<BookingCard> {
                     }
                   }
                 },
-                minDateTime: _parseDateTime(startDate, startTime).add(const Duration(hours: 3)),
+                minDateTime: _parseDateTime(
+                  startDate,
+                  startTime,
+                ).add(const Duration(hours: 3)),
               ),
             ),
           ],

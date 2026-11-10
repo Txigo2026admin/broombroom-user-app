@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'date_time_picker.dart';
 import '../../../theme/app_theme.dart';
 
@@ -13,10 +14,37 @@ class PackageBookingDialog extends StatefulWidget {
 }
 
 class _PackageBookingDialogState extends State<PackageBookingDialog> {
-  String startDate = 'Sun May 03';
-  String startTime = '03:00 PM';
-  String endDate = 'Wed May 06';
-  String endTime = '07:00 PM';
+  late String startDate;
+  late String startTime;
+  late String endDate;
+  late String endTime;
+
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    final minTime = now.add(const Duration(minutes: 15));
+    int remainder = minTime.minute % 15;
+    int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final startDt = _getInitialStartTime();
+    final endDt = startDt.add(const Duration(days: 3));
+
+    startDate = DateFormat('dd-MM-yyyy').format(startDt);
+    startTime = DateFormat('hh:mm a').format(startDt);
+    endDate = DateFormat('dd-MM-yyyy').format(endDt);
+    endTime = DateFormat('hh:mm a').format(endDt);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -215,8 +243,9 @@ class _PackageBookingDialogState extends State<PackageBookingDialog> {
     String label,
     String date,
     String subText,
-    Function(Map<String, dynamic>?) onResult,
-  ) {
+    Function(Map<String, dynamic>?) onResult, {
+    DateTime? minDateTime,
+  }) {
     return GestureDetector(
       onTap: () async {
         final result = await showDialog<Map<String, dynamic>>(
@@ -226,6 +255,7 @@ class _PackageBookingDialogState extends State<PackageBookingDialog> {
                 label: label,
                 initialDate: date,
                 initialTime: subText.contains('M') ? subText : '12:00 PM',
+                minDateTime: minDateTime ?? _getInitialStartTime(),
               ),
         );
         onResult(result);
