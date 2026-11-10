@@ -401,8 +401,8 @@ class _BookingCardState extends State<BookingCard> {
             ),
           ],
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 14.0, bottom: 20),
+        Positioned(
+          right: 12,
           child: GestureDetector(
             onTap: () {
               final String temp = _fromController.text;
@@ -421,14 +421,14 @@ class _BookingCardState extends State<BookingCard> {
             child: Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: kCardBg,
+                color: Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(color: kInputBorder, width: 1.5),
                 boxShadow: [
                   BoxShadow(
                     color: kAmber.withValues(alpha: 0.25),
                     blurRadius: 10,
-                    offset: const Offset(0, 3),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),

@@ -8,8 +8,8 @@ class CarService {
     CarCategory(id: 'cat-suv', name: 'SUV', displayName: 'SUV', seater: 6, baseFare: 80, perKmRate: 19, status: 'Active'),
     CarCategory(id: 'cat-suvplus', name: 'SUV+', displayName: 'SUV+', seater: 7, baseFare: 100, perKmRate: 23, status: 'Active'),
     CarCategory(id: 'cat-traveller13', name: '13 Seater Traveller', displayName: '13 Seater Traveller', seater: 13, baseFare: 150, perKmRate: 35, status: 'Active'),
-    CarCategory(id: 'cat-traveller17', name: '17 Seater Traveller', displayName: '17 Seater Traveller', seater: 17, baseFare: 180, perKmRate: 40, status: 'Active'),
-    CarCategory(id: 'cat-traveller25', name: '25 Seater Traveller', displayName: '25 Seater Traveller', seater: 25, baseFare: 220, perKmRate: 45, status: 'Active'),
+    CarCategory(id: 'cat-traveller17', name: '17 Seater Urbania', displayName: '17 Seater Urbania', seater: 17, baseFare: 180, perKmRate: 40, status: 'Active'),
+    CarCategory(id: 'cat-traveller24', name: '24 Seater Urbania', displayName: '24 Seater Urbania', seater: 24, baseFare: 220, perKmRate: 45, status: 'Active'),
   ];
 
   static Future<List<CarCategory>> getCarCategories() async {
@@ -17,7 +17,32 @@ class CarService {
       final response = await ApiService.get('/car-categories');
       if (response.statusCode == 200) {
         List<dynamic> data = jsonDecode(response.body);
-        final list = data.map((item) => CarCategory.fromJson(item)).toList();
+        final list = data.map((item) {
+          final cat = CarCategory.fromJson(item);
+          if (cat.seater == 25 || cat.name.contains('25') || cat.displayName.contains('25')) {
+            return CarCategory(
+              id: cat.id,
+              name: cat.name.replaceAll('25', '24').replaceAll('Traveller', 'Urbania'),
+              displayName: cat.displayName.replaceAll('25', '24').replaceAll('Traveller', 'Urbania'),
+              seater: 24,
+              baseFare: cat.baseFare,
+              perKmRate: cat.perKmRate,
+              status: cat.status,
+            );
+          }
+          if (cat.seater == 17 || cat.name.contains('17') || cat.displayName.contains('17')) {
+            return CarCategory(
+              id: cat.id,
+              name: cat.name.replaceAll('Traveller', 'Urbania'),
+              displayName: cat.displayName.replaceAll('Traveller', 'Urbania'),
+              seater: 17,
+              baseFare: cat.baseFare,
+              perKmRate: cat.perKmRate,
+              status: cat.status,
+            );
+          }
+          return cat;
+        }).toList();
         if (list.isNotEmpty) {
           return list;
         }

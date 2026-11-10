@@ -92,11 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             _buildBookingCard(),
+            const SizedBox(height: 8),
+            const ExperienceReviewCard(forceShow: true),
+            const SizedBox(height: 4),
             PetCabBanner(phoneNumber: widget.phoneNumber),
             const SizedBox(height: 4),
             const BannersSection(),
-            const SizedBox(height: 4),
-            const ExperienceReviewCard(),
             const SizedBox(height: 4),
             const ExpertSection(),
           ],

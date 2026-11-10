@@ -42,6 +42,11 @@ class BannersSection extends StatelessWidget {
         height: 154,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2C3E50), Color(0xFF1A1A24)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           border: Border.all(color: kInputBorder.withValues(alpha: 0.8)),
           boxShadow: [
             BoxShadow(
@@ -53,6 +58,7 @@ class BannersSection extends StatelessWidget {
           image: DecorationImage(
             image: AssetImage(imageUrl),
             fit: BoxFit.cover,
+            onError: (exception, stackTrace) {},
             colorFilter: ColorFilter.mode(
               Colors.black.withValues(alpha: 0.35),
               BlendMode.darken,

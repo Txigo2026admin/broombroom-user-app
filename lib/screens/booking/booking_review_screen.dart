@@ -189,7 +189,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   double get _finalPrice => (_basePrice + _addonsTotal) - _discount;
 
   int get _advancePercentage {
-    final advVal = widget.pricingDetails?['advanceValue'] ??
+    final advVal =
+        widget.pricingDetails?['advanceValue'] ??
         widget.pricingDetails?['advancePercentage'] ??
         widget.pricingDetails?['advancePct'];
     if (advVal is num && advVal > 0) return advVal.toInt();
@@ -218,18 +219,22 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   }
 
   Future<void> _handleConfirmBooking() async {
-    final String pickup = _pickupLocationController.text.trim().isNotEmpty
-        ? _pickupLocationController.text.trim()
-        : widget.from;
-    final String drop = _dropLocationController.text.trim().isNotEmpty
-        ? _dropLocationController.text.trim()
-        : widget.to;
-    final String name = _nameController.text.trim().isNotEmpty
-        ? _nameController.text.trim()
-        : 'Customer';
-    final String phone = _phoneController.text.trim().isNotEmpty
-        ? _phoneController.text.trim()
-        : widget.phoneNumber;
+    final String pickup =
+        _pickupLocationController.text.trim().isNotEmpty
+            ? _pickupLocationController.text.trim()
+            : widget.from;
+    final String drop =
+        _dropLocationController.text.trim().isNotEmpty
+            ? _dropLocationController.text.trim()
+            : widget.to;
+    final String name =
+        _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : 'Customer';
+    final String phone =
+        _phoneController.text.trim().isNotEmpty
+            ? _phoneController.text.trim()
+            : widget.phoneNumber;
 
     if (pickup.isEmpty || drop.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -252,25 +257,33 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     });
 
     final double advanceAmount = _payableAmount;
-    final double dueAmount = (_finalPrice - advanceAmount).clamp(0, double.infinity);
+    final double dueAmount = (_finalPrice - advanceAmount).clamp(
+      0,
+      double.infinity,
+    );
 
-    final String chosenCarCategory = _includePet
-        ? (widget.carName.contains('Pet')
-            ? '${widget.carName} (Pet count: $_petCount)'
-            : '${widget.carName} (with $_petCount pet${_petCount > 1 ? "s" : ""})')
-        : widget.carName;
+    final String chosenCarCategory =
+        _includePet
+            ? (widget.carName.contains('Pet')
+                ? '${widget.carName} (Pet count: $_petCount)'
+                : '${widget.carName} (with $_petCount pet${_petCount > 1 ? "s" : ""})')
+            : widget.carName;
 
     final booking = Booking(
       customerName: name,
       customerMobile: phone,
-      customerEmail: _emailController.text.trim().isEmpty
-          ? null
-          : _emailController.text.trim(),
-      serviceType: widget.isAirport
-          ? 'Airport'
-          : (widget.isRental
-              ? 'Rental'
-              : (widget.isOneWay ? 'Outstation oneway' : 'Outstation roundtrip')),
+      customerEmail:
+          _emailController.text.trim().isEmpty
+              ? null
+              : _emailController.text.trim(),
+      serviceType:
+          widget.isAirport
+              ? 'Airport'
+              : (widget.isRental
+                  ? 'Rental'
+                  : (widget.isOneWay
+                      ? 'Outstation oneway'
+                      : 'Outstation roundtrip')),
       airportDirection: widget.airportDirection,
       airportTerminal: widget.airportTerminal,
       rentalPackage: widget.rentalPackage,
@@ -286,7 +299,25 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       returnDate: widget.returnDate,
       returnTime: widget.returnTime,
       vehicleCategory: chosenCarCategory,
-      seater: 4,
+      seater: () {
+        final c = widget.carName.toLowerCase();
+        if (c.contains('24') || c.contains('25')) {
+          return 24;
+        }
+        if (c.contains('17')) {
+          return 17;
+        }
+        if (c.contains('13')) {
+          return 13;
+        }
+        if (c.contains('suv+') || c.contains('crysta')) {
+          return 7;
+        }
+        if (c.contains('suv') || c.contains('ertiga') || c.contains('innova')) {
+          return 6;
+        }
+        return 4;
+      }(),
       fare: _finalPrice,
       advance: advanceAmount,
       dueFare: dueAmount,
@@ -319,12 +350,13 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => ThankYouScreen(
-              booking: createdBooking,
-              paidAmount: 0,
-              paymentMethod: 'Pay on Trip',
-              phoneNumber: widget.phoneNumber,
-            ),
+            builder:
+                (context) => ThankYouScreen(
+                  booking: createdBooking,
+                  paidAmount: 0,
+                  paymentMethod: 'Pay on Trip',
+                  phoneNumber: widget.phoneNumber,
+                ),
           ),
         );
         return;
@@ -332,7 +364,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
       // 2. POST /api/payment/create-order -> Cashfree paymentSessionId
       final orderRes = await PaymentService.createPaymentOrder(
-          createdBooking.bookingId ?? '');
+        createdBooking.bookingId ?? '',
+      );
 
       if (!mounted) return;
 
@@ -344,11 +377,12 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => PaymentPendingScreen(
-              booking: createdBooking,
-              phoneNumber: widget.phoneNumber,
-              payableAdvance: advanceAmount,
-            ),
+            builder:
+                (context) => PaymentPendingScreen(
+                  booking: createdBooking,
+                  phoneNumber: widget.phoneNumber,
+                  payableAdvance: advanceAmount,
+                ),
           ),
         );
         return;
@@ -381,14 +415,16 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => ThankYouScreen(
-              booking: statusRes.booking ?? createdBooking,
-              paidAmount: statusRes.paidAmount > 0
-                  ? statusRes.paidAmount
-                  : advanceAmount,
-              paymentMethod: statusRes.paymentMethod ?? 'Cashfree',
-              phoneNumber: widget.phoneNumber,
-            ),
+            builder:
+                (context) => ThankYouScreen(
+                  booking: statusRes.booking ?? createdBooking,
+                  paidAmount:
+                      statusRes.paidAmount > 0
+                          ? statusRes.paidAmount
+                          : advanceAmount,
+                  paymentMethod: statusRes.paymentMethod ?? 'Cashfree',
+                  phoneNumber: widget.phoneNumber,
+                ),
           ),
         );
       } else {
@@ -396,11 +432,12 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => PaymentPendingScreen(
-              booking: statusRes.booking ?? createdBooking,
-              phoneNumber: widget.phoneNumber,
-              payableAdvance: advanceAmount,
-            ),
+            builder:
+                (context) => PaymentPendingScreen(
+                  booking: statusRes.booking ?? createdBooking,
+                  phoneNumber: widget.phoneNumber,
+                  payableAdvance: advanceAmount,
+                ),
           ),
         );
       }
@@ -543,14 +580,34 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           _buildSummaryItem('Car Type:', '${widget.carName} or Equivalent'),
           _buildSummaryItem('Pickup Date:', '${widget.date} ${widget.time}'),
           if (!widget.isOneWay && widget.returnDate != null)
-            _buildSummaryItem('Return Date:', '${widget.returnDate} ${widget.returnTime ?? ''}'),
-          if (widget.airportTerminal != null && widget.airportTerminal!.isNotEmpty)
+            _buildSummaryItem(
+              'Return Date:',
+              '${widget.returnDate} ${widget.returnTime ?? ''}',
+            ),
+          if (widget.airportTerminal != null &&
+              widget.airportTerminal!.isNotEmpty)
             _buildSummaryItem('Terminal:', widget.airportTerminal!),
           _buildSummaryItem(
-            'Kms included:',
+            'Total kms:',
             widget.isRental && widget.rentalPackage != null
                 ? widget.rentalPackage!
-                : '260 kms',
+                : (() {
+                  final distance =
+                      widget.pricingDetails?['distance'] ??
+                      widget.pricingDetails?['billableKms'];
+
+                  if (distance == null) {
+                    return 'Calculating distance...';
+                  }
+
+                  final km = double.tryParse(distance.toString());
+
+                  if (km == null || km <= 0) {
+                    return 'Distance unavailable';
+                  }
+
+                  return '${km.toStringAsFixed(2)} kms';
+                })(),
           ),
         ],
       ),
@@ -662,10 +719,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             children: [
               Container(
                 width: 68,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                 decoration: BoxDecoration(
                   color: kInputBg,
                   borderRadius: BorderRadius.circular(12),
@@ -752,11 +806,18 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       ),
       child: TextField(
         controller: controller,
-        style: GoogleFonts.outfit(color: kInk, fontWeight: FontWeight.w500, fontSize: 13),
+        style: GoogleFonts.outfit(
+          color: kInk,
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: hint,
-          hintStyle: GoogleFonts.outfit(color: kInkSoft.withValues(alpha: 0.6), fontSize: 12.5),
+          hintStyle: GoogleFonts.outfit(
+            color: kInkSoft.withValues(alpha: 0.6),
+            fontSize: 12.5,
+          ),
         ),
       ),
     );
@@ -976,9 +1037,10 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   }
 
   Widget _buildPetAddonItem() {
-    final String title = widget.petType != null && widget.petType!.isNotEmpty
-        ? 'Carrying Pet (${widget.petType})'
-        : 'Carrying Pet';
+    final String title =
+        widget.petType != null && widget.petType!.isNotEmpty
+            ? 'Carrying Pet (${widget.petType})'
+            : 'Carrying Pet';
     final int totalPetPrice = (_petCount * pricePerPet).toInt();
 
     return AnimatedContainer(
@@ -1085,7 +1147,9 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                         setState(() => _includePet = false);
                       }
                     },
-                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)),
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(6),
+                    ),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       child: Icon(Icons.remove, size: 13, color: kInk),
@@ -1105,7 +1169,9 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                         setState(() => _petCount++);
                       }
                     },
-                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)),
+                    borderRadius: const BorderRadius.horizontal(
+                      right: Radius.circular(6),
+                    ),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       child: Icon(Icons.add, size: 13, color: kInk),
@@ -1258,7 +1324,9 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           ),
           _buildInclusionPoint(
             Icons.check_circle_rounded,
-            widget.isAirport ? 'Driver Allowance & Airport Assistance' : 'Driver Allowance',
+            widget.isAirport
+                ? 'Driver Allowance & Airport Assistance'
+                : 'Driver Allowance',
             true,
           ),
           const SizedBox(height: 8),
@@ -1295,7 +1363,11 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           const SizedBox(height: 8),
           _buildInclusionPoint(Icons.cancel_rounded, 'Toll / State Tax', false),
           _buildInclusionPoint(Icons.cancel_rounded, 'GST (5%)', false),
-          _buildInclusionPoint(Icons.cancel_rounded, 'Parking Charges (as per actuals)', false),
+          _buildInclusionPoint(
+            Icons.cancel_rounded,
+            'Parking Charges (as per actuals)',
+            false,
+          ),
           _buildInclusionPoint(
             Icons.cancel_rounded,
             'Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour',
@@ -1322,8 +1394,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             widget.isAirport
                 ? '• 0-15 km: fixed charges of ₹${(widget.pricingDetails?['fare0to15'] ?? widget.pricingDetails?['baseFare'] ?? 750).toInt()}.\n• 15-25 km: fixed charges of ₹${(widget.pricingDetails?['fare15to25'] ?? 1050).toInt()}.\n• Beyond 25 km: Airport flat transfer is redirected to Outstation one-way rates.\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
                 : widget.isOneWay
-                    ? '• Distance Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Billable distance drops into active bracket (e.g. 30 km drops to 0-50 km billable; 200-4000 km charges apply per total km).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
-                    : '• Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Price evaluates: Distance fare vs Total hours fare vs Threshold value (higher applies).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.',
+                ? '• Distance Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Billable distance drops into active bracket (e.g. 30 km drops to 0-50 km billable; 200-4000 km charges apply per total km).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.'
+                : '• Roundtrip Slabs: 0-50 km, 51-100 km, 101-150 km, 151-200 km, 200-4000 km.\n• Price evaluates: Distance fare vs Total hours fare vs Threshold value (higher applies).\n• Waiting charges (after 60 mins of pickup time): ₹${(widget.pricingDetails?['waitingChargePerHour'] ?? widget.pricingDetails?['waitingCharge'] ?? 150).toInt()}/hour.\n• Night driving allowances: ₹${(widget.pricingDetails?['nightAllowance'] ?? 250).toInt()}/- (Applicable once if ride time falls between 11 pm till 6 am).\n• Advance payment: $_advancePercentage% to confirm booking.',
             style: GoogleFonts.outfit(
               fontSize: 11,
               color: kInkSoft,
@@ -1426,7 +1498,10 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
             children: [
               _buildPayOption('Book at ₹0', percent: 0),
               const SizedBox(width: 4),
-              _buildPayOption('Pay $_advancePercentage%', percent: _advancePercentage),
+              _buildPayOption(
+                'Pay $_advancePercentage%',
+                percent: _advancePercentage,
+              ),
               const SizedBox(width: 4),
               _buildPayOption('Pay 100%', percent: 100),
               const SizedBox(width: 8),

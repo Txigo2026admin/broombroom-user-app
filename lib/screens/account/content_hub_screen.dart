@@ -334,6 +334,13 @@ class _ContentCardState extends State<_ContentCard> {
                           height: item.isTall ? 240 : 160,
                           width: double.infinity,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            height: item.isTall ? 240 : 160,
+                            color: const Color(0xFF1E293B),
+                            child: const Center(
+                              child: Icon(Icons.photo_size_select_actual_outlined, color: Colors.white54, size: 36),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -455,6 +462,13 @@ class _DetailsSheet extends StatelessWidget {
                       height: 240,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 240,
+                        color: const Color(0xFF1E293B),
+                        child: const Center(
+                          child: Icon(Icons.photo_size_select_actual_outlined, color: Colors.white54, size: 40),
+                        ),
+                      ),
                     ),
                   ),
                   // drag handle

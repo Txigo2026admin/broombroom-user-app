@@ -6,13 +6,16 @@ import '../../../theme/app_theme.dart';
 
 /// A sleek in-app experience review card inspired by Groww's rating prompt.
 ///
-/// Features:
-/// - Gradient card surface with warm glow + soft shadow.
-/// - 5 large stars filled with a gold gradient and a soft halo glow.
-/// - Animated rating label + optional comment field that expands smoothly.
-/// - Gradient "Submit Feedback" CTA with shadow and haptic feedback.
-/// - Animated thank-you state showing the user's rating.
-/// - Remembers dismissal / submission via `SharedPreferences`.
+/// Visual appearance (matches Groww exactly):
+/// - Clean white container with 16px rounded corners & subtle 1px border.
+/// - Top row: "How is your experience with BroomBroom?" with a minimalist '✕' on the right.
+/// - 5 large, elegantly spaced outline stars in slate-grey (#8C95A6).
+/// - Tapping a star fills it with rich golden-amber (#FFB400) and smoothly expands:
+///     * Emotional reaction label ("Loved it! 😍", "Great experience! 😊", etc.)
+///     * Groww-style feedback chips (e.g., "Punctual Driver", "Clean Cab", "Polite")
+///     * Optional comment field ("Tell us more... (optional)")
+///     * High-contrast "Submit Feedback" button
+///     * Animated thank-you state upon submission
 class ExperienceReviewCard extends StatefulWidget {
   final String appName;
   final VoidCallback? onDismissed;
@@ -28,6 +31,14 @@ class ExperienceReviewCard extends StatefulWidget {
     this.margin,
     this.forceShow = false,
   });
+
+  /// Clears stored dismissal from SharedPreferences so the card shows again.
+  static Future<void> resetDismissal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_ExperienceReviewCardState._prefKeyDismissed);
+    } catch (_) {}
+  }
 
   /// Displays the review prompt as a modal bottom sheet.
   static Future<void> showAsBottomSheet(
@@ -46,7 +57,7 @@ class ExperienceReviewCard extends StatefulWidget {
             ),
             child: Container(
               decoration: const BoxDecoration(
-                color: kCardBg,
+                color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
               ),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -86,24 +97,34 @@ class ExperienceReviewCard extends StatefulWidget {
 }
 
 class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
-  static const String _prefKeyDismissed = 'bb_experience_review_dismissed';
+  static const String _prefKeyDismissed = 'bb_experience_review_v2_dismissed_at';
 
   int _selectedRating = 0;
   bool _submitted = false;
   bool _isDismissed = false;
   final TextEditingController _commentController = TextEditingController();
+  final Set<String> _selectedTags = {};
 
   @override
   void initState() {
     super.initState();
-    if (!widget.forceShow) _checkIfDismissed();
+    if (!widget.forceShow) {
+      _checkIfDismissed();
+    }
   }
 
   Future<void> _checkIfDismissed() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final dismissed = prefs.getBool(_prefKeyDismissed) ?? false;
-      if (dismissed && mounted) setState(() => _isDismissed = true);
+      final dismissedAt = prefs.getInt(_prefKeyDismissed) ?? 0;
+      if (dismissedAt > 0) {
+        final days = DateTime.now()
+            .difference(DateTime.fromMillisecondsSinceEpoch(dismissedAt))
+            .inDays;
+        if (days < 3 && mounted) {
+          setState(() => _isDismissed = true);
+        }
+      }
     } catch (_) {}
   }
 
@@ -113,7 +134,10 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
     widget.onDismissed?.call();
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefKeyDismissed, true);
+      await prefs.setInt(
+        _prefKeyDismissed,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (_) {}
   }
 
@@ -124,7 +148,10 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
     widget.onSubmitted?.call(_selectedRating, _commentController.text.trim());
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_prefKeyDismissed, true);
+      await prefs.setInt(
+        _prefKeyDismissed,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (_) {}
   }
 
@@ -139,7 +166,7 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
       case 2:
         return 'Could be better 😕';
       case 1:
-        return 'Not a great experience 😞';
+        return 'Disappointing 😞';
       default:
         return '';
     }
@@ -179,28 +206,16 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
         margin:
             widget.margin ??
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              kCardBg,
-              Color.alphaBlend(kAmberSoft.withValues(alpha: 0.35), kCardBg),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: kAmber.withValues(alpha: 0.16)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
           boxShadow: [
             BoxShadow(
-              color: kAmber.withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-            BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -217,13 +232,15 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildHeader(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         _buildStarRow(),
         AnimatedSize(
           duration: const Duration(milliseconds: 320),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: _selectedRating == 0 ? _buildHint() : _buildRatedSection(),
+          child: _selectedRating == 0
+              ? const SizedBox.shrink()
+              : _buildRatedSection(),
         ),
       ],
     );
@@ -231,30 +248,30 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
 
   Widget _buildHeader() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
             'How is your experience with ${widget.appName}?',
             style: GoogleFonts.outfit(
-              fontSize: 16.5,
+              fontSize: 18.0,
               fontWeight: FontWeight.w700,
-              color: kInk,
-              height: 1.28,
+              color: const Color(0xFF1E2530),
+              height: 1.25,
               letterSpacing: -0.25,
             ),
           ),
         ),
         const SizedBox(width: 8),
-        Material(
-          color: kInputBg.withValues(alpha: 0.7),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: _dismissCard,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(Icons.close_rounded, size: 18, color: kInkSoft),
+        InkResponse(
+          onTap: _dismissCard,
+          radius: 18,
+          child: const Padding(
+            padding: EdgeInsets.all(4),
+            child: Icon(
+              Icons.close_rounded,
+              size: 22,
+              color: Color(0xFF4A5568),
             ),
           ),
         ),
@@ -279,71 +296,40 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
+        final wasPositive = _selectedRating >= 4;
+        final isNowPositive = starIndex >= 4;
+        if (wasPositive != isNowPositive) {
+          _selectedTags.clear();
+          _commentController.clear();
+        }
         setState(() => _selectedRating = starIndex);
       },
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
         child: AnimatedScale(
-          scale: isSelected ? 1.2 : (isFilled ? 1.06 : 1.0),
-          duration: const Duration(milliseconds: 220),
+          scale: isSelected ? 1.16 : (isFilled ? 1.05 : 1.0),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutBack,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow:
-                  isFilled
-                      ? [
-                        BoxShadow(
-                          color: const Color(
-                            0xFFFFB300,
-                          ).withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                      : const <BoxShadow>[],
-            ),
-            child:
-                isFilled
-                    ? ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback:
-                          (rect) => const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Color(0xFFFFD54F), Color(0xFFFF9800)],
-                          ).createShader(rect),
-                      child: const Icon(
-                        Icons.star_rounded,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    )
-                    : Icon(
-                      Icons.star_outline_rounded,
-                      size: 40,
-                      color: const Color(0xFF9E9E9E).withValues(alpha: 0.65),
-                    ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHint() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Center(
-        child: Text(
-          'Tap a star to rate your experience',
-          style: GoogleFonts.outfit(
-            fontSize: 12.5,
-            color: kInkSoft,
-            fontWeight: FontWeight.w500,
-          ),
+          child: isFilled
+              ? ShaderMask(
+                  blendMode: BlendMode.srcIn,
+                  shaderCallback: (rect) => const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFFFFCA28), Color(0xFFFF9800)],
+                  ).createShader(rect),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    size: 42,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(
+                  Icons.star_outline_rounded,
+                  size: 42,
+                  color: Color(0xFF8C95A6),
+                ),
         ),
       ),
     );
@@ -352,7 +338,7 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
   Widget _buildRatedSection() {
     final color = _getRatingColor(_selectedRating);
     return Padding(
-      padding: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.only(top: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -374,7 +360,7 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
               key: ValueKey<int>(_selectedRating),
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
-                fontSize: 13.5,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w700,
                 color: color,
                 letterSpacing: 0.1,
@@ -382,6 +368,8 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
             ),
           ),
           const SizedBox(height: 12),
+          _buildQuickChips(),
+          const SizedBox(height: 10),
           TextField(
             controller: _commentController,
             maxLines: 2,
@@ -391,25 +379,25 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
               hintText:
                   _selectedRating >= 4
                       ? 'What did you like most? (optional)'
-                      : 'How can we improve? (optional)',
+                      : 'Tell us how we can improve (optional)',
               hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: kInkSoft),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 12,
               ),
               filled: true,
-              fillColor: kInputBg,
+              fillColor: const Color(0xFFF8FAFC),
               isDense: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: kInputBorder),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: kInputBorder),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: const BorderSide(color: kAmberDeep, width: 1.5),
               ),
             ),
@@ -453,7 +441,7 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
                 Text(
                   'Submit Feedback',
                   style: GoogleFonts.outfit(
-                    fontSize: 13.5,
+                    fontSize: 14.0,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                     letterSpacing: 0.2,
@@ -464,6 +452,72 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildQuickChips() {
+    final List<String> tags = _selectedRating >= 4
+        ? const [
+            'Punctual Pilot',
+            'Clean & Fresh Cab',
+            'Polite Behavior',
+            'Smooth Ride',
+            'Great Pricing',
+            'Easy App Experience',
+          ]
+        : const [
+            'Delayed Pickup',
+            'Cab Not Clean',
+            'AC / Comfort Issue',
+            'Driver Behavior',
+            'Fare Concern',
+            'App / Map Issue',
+          ];
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: tags.map((tag) {
+        final isSelected = _selectedTags.contains(tag);
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              if (isSelected) {
+                _selectedTags.remove(tag);
+              } else {
+                _selectedTags.add(tag);
+              }
+              if (_selectedTags.isNotEmpty) {
+                _commentController.text = _selectedTags.join(', ');
+              } else {
+                _commentController.clear();
+              }
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFFFFF3CD) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected ? kAmberDeep : const Color(0xFFE2E8F0),
+                width: isSelected ? 1.2 : 1.0,
+              ),
+            ),
+            child: Text(
+              tag,
+              style: GoogleFonts.outfit(
+                fontSize: 12.0,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF8B5A00) : const Color(0xFF475569),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

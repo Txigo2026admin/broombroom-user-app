@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'account_details_screen.dart';
 import 'bookings_screen.dart';
 import 'content_hub_screen.dart';
+import '../home/widgets/experience_review_card.dart';
 import '../../theme/app_theme.dart';
 
 class AccountScreen extends StatelessWidget {
@@ -99,6 +100,12 @@ class AccountScreen extends StatelessWidget {
                     'Road trips for you',
                     Icons.explore_rounded,
                   ),
+                  const SizedBox(height: 14),
+                  _buildMenuItem(
+                    context,
+                    'Rate your experience',
+                    Icons.star_rounded,
+                  ),
                   const Spacer(),
                   // Social Media Icons
                   Row(
@@ -156,6 +163,10 @@ class AccountScreen extends StatelessWidget {
           color: kAmberDeep,
         ),
         onTap: () {
+          if (title == 'Rate your experience') {
+            ExperienceReviewCard.showAsBottomSheet(context);
+            return;
+          }
           Widget nextScreen;
           if (title == 'My bookings') {
             nextScreen = const BookingsScreen();

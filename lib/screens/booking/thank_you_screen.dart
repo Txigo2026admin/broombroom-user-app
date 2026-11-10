@@ -4,6 +4,7 @@ import '../../data/models/booking.dart';
 import '../../theme/app_theme.dart';
 import '../account/bookings_screen.dart';
 import '../home/home_screen.dart';
+import '../home/widgets/experience_review_card.dart';
 
 class ThankYouScreen extends StatelessWidget {
   final Booking booking;
@@ -263,7 +264,14 @@ class ThankYouScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 18),
+
+              // Experience Review Card
+              const ExperienceReviewCard(
+                forceShow: true,
+                margin: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 24),
 
               // Action Buttons
               GestureDetector(
