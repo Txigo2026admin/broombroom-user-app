@@ -1061,6 +1061,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                               _includedKms[car.name] ?? _distance,
                         },
                         originalPrice: _originalPrices[car.name],
+                        distance: _distance > 0 ? _distance : null,
                       ),
                 ),
               );

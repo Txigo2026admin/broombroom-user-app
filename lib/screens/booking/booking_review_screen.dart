@@ -32,6 +32,8 @@ class BookingReviewScreen extends StatefulWidget {
   final String? airportTerminal;
   final Map<String, dynamic>? pricingDetails;
   final double? originalPrice;
+  final double? distance;
+  final String? duration;
 
   const BookingReviewScreen({
     super.key,
@@ -57,6 +59,8 @@ class BookingReviewScreen extends StatefulWidget {
     this.airportTerminal,
     this.pricingDetails,
     this.originalPrice,
+    this.distance,
+    this.duration,
   });
 
   @override
@@ -90,6 +94,26 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   double _discount = 0;
   String _appliedCoupon = '';
   final TextEditingController _couponController = TextEditingController();
+
+  String? get _resolvedDistance {
+    if (widget.distance != null && widget.distance! > 0) {
+      return widget.distance!.toStringAsFixed(1);
+    }
+    final d = widget.pricingDetails?['distance'] ??
+        widget.pricingDetails?['includedKms'] ??
+        widget.pricingDetails?['billableKms'];
+    return d?.toString();
+  }
+
+  String? get _resolvedDuration {
+    if (widget.duration != null && widget.duration!.isNotEmpty) {
+      return widget.duration;
+    }
+    final dur = widget.pricingDetails?['duration'] ??
+        widget.pricingDetails?['totalHours'];
+    if (dur != null) return '$dur hrs';
+    return null;
+  }
 
   @override
   void initState() {
@@ -153,8 +177,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         dropAddress: widget.to,
         fromCity: widget.from.contains(',') ? widget.from.split(',')[0].trim() : widget.from,
         toCity: widget.to.contains(',') ? widget.to.split(',')[0].trim() : widget.to,
-        distance: widget.distance?.toString(),
-        duration: widget.duration,
+        distance: _resolvedDistance,
+        duration: _resolvedDuration,
         serviceType: widget.isAirport
             ? 'Airport'
             : (widget.isRental
@@ -326,8 +350,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       dropAddress: drop,
       fromCity: pickup.contains(',') ? pickup.split(',')[0].trim() : pickup,
       toCity: drop.contains(',') ? drop.split(',')[0].trim() : drop,
-      distance: widget.distance?.toString(),
-      duration: widget.duration,
+      distance: _resolvedDistance,
+      duration: _resolvedDuration,
       petFriendly: _includePet,
       petCount: _petCount,
       source: 'BroomBoom App',
