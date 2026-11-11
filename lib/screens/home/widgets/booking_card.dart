@@ -5,6 +5,7 @@ import 'date_time_picker.dart';
 import '../../../widgets/city_autocomplete_field.dart';
 import '../../booking/cab_selection_screen.dart';
 import '../../../theme/app_theme.dart';
+import '../../../data/services/booking_service.dart';
 
 class BookingCard extends StatefulWidget {
   final bool isOneWay;
@@ -336,13 +337,36 @@ class _BookingCardState extends State<BookingCard> {
       );
       return;
     }
+
+    final fromAddress = _fromFullAddress ?? _fromController.text.trim();
+    final toAddress = _toFullAddress ?? _toController.text.trim();
+
+    // Instant sync to Admin Booking Leads
+    BookingService.recordSearchLead(
+      pickupAddress: fromAddress,
+      dropAddress: toAddress,
+      fromCity: _fromController.text.trim(),
+      toCity: _toController.text.trim(),
+      serviceType: widget.isOneWay ? 'Outstation oneway' : 'Outstation roundtrip',
+      wayType: widget.isOneWay ? 'One Way' : 'Round Way',
+      pickupDate: startDate,
+      pickupTime: startTime,
+      returnDate: !widget.isOneWay ? endDate : null,
+      returnTime: !widget.isOneWay ? endTime : null,
+      pickupLat: _fromLat?.toString(),
+      pickupLng: _fromLng?.toString(),
+      dropLat: _toLat?.toString(),
+      dropLng: _toLng?.toString(),
+      customerMobile: widget.phoneNumber,
+    );
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (context) => CabSelectionScreen(
-              from: _fromFullAddress ?? _fromController.text.trim(),
-              to: _toFullAddress ?? _toController.text.trim(),
+              from: fromAddress,
+              to: toAddress,
               fromLat: _fromLat,
               fromLng: _fromLng,
               toLat: _toLat,

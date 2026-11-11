@@ -144,6 +144,39 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           _phoneController.text = p;
         }
       });
+
+      // Record this booking review as an active lead in the admin panel
+      final rawPrice =
+          double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+      BookingService.recordSearchLead(
+        pickupAddress: widget.from,
+        dropAddress: widget.to,
+        fromCity: widget.from.contains(',') ? widget.from.split(',')[0].trim() : widget.from,
+        toCity: widget.to.contains(',') ? widget.to.split(',')[0].trim() : widget.to,
+        distance: widget.distance?.toString(),
+        duration: widget.duration,
+        serviceType: widget.isAirport
+            ? 'Airport'
+            : (widget.isRental
+                ? 'Rental'
+                : (widget.isOneWay
+                    ? 'Outstation oneway'
+                    : 'Outstation roundtrip')),
+        wayType: widget.isOneWay ? 'One Way' : 'Round Way',
+        airportDirection: widget.airportDirection,
+        airportTerminal: widget.airportTerminal,
+        rentalPackage: widget.rentalPackage,
+        pickupDate: widget.date,
+        pickupTime: widget.time,
+        returnDate: widget.returnDate,
+        returnTime: widget.returnTime,
+        vehicleCategory: widget.carName,
+        fare: rawPrice,
+        petFriendly: _includePet,
+        petCount: _petCount,
+        customerName: name ?? 'App User',
+        customerMobile: _phoneController.text.isNotEmpty ? _phoneController.text : (savedPhone ?? widget.phoneNumber),
+      );
     }
   }
 
@@ -284,12 +317,28 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                   : (widget.isOneWay
                       ? 'Outstation oneway'
                       : 'Outstation roundtrip')),
+      wayType: widget.isOneWay ? 'One Way' : 'Round Way',
       airportDirection: widget.airportDirection,
       airportTerminal: widget.airportTerminal,
       rentalPackage: widget.rentalPackage,
-      state: 'Default',
+      state: 'West Bengal',
       pickupAddress: pickup,
       dropAddress: drop,
+      fromCity: pickup.contains(',') ? pickup.split(',')[0].trim() : pickup,
+      toCity: drop.contains(',') ? drop.split(',')[0].trim() : drop,
+      distance: widget.distance?.toString(),
+      duration: widget.duration,
+      petFriendly: _includePet,
+      petCount: _petCount,
+      source: 'BroomBoom App',
+      addons: {
+        'petAllowance': _includePet,
+        'petCount': _petCount,
+        'roofCarrier': _includeLuggage,
+        'newVehicle': _includeNewCar,
+        'language': _includeLanguage,
+        'expressway': _includeExpressway,
+      },
       pickupLat: widget.fromLat?.toString(),
       pickupLng: widget.fromLng?.toString(),
       dropLat: widget.toLat?.toString(),
@@ -321,6 +370,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       fare: _finalPrice,
       advance: advanceAmount,
       dueFare: dueAmount,
+      status: 'Pending',
     );
 
     try {

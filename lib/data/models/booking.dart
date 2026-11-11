@@ -14,6 +14,14 @@ class Booking {
   final String pickupAddress;
   final String dropAddress;
   final String? distance;
+  final String? fromCity;
+  final String? toCity;
+  final String? duration;
+  final bool petFriendly;
+  final int petCount;
+  final Map<String, dynamic>? addons;
+  final String source;
+  final dynamic searchDetails;
   final String? pickupLat;
   final String? pickupLng;
   final String? dropLat;
@@ -51,6 +59,14 @@ class Booking {
     required this.pickupAddress,
     required this.dropAddress,
     this.distance,
+    this.fromCity,
+    this.toCity,
+    this.duration,
+    this.petFriendly = false,
+    this.petCount = 0,
+    this.addons,
+    this.source = 'BroomBoom App',
+    this.searchDetails,
     this.pickupLat,
     this.pickupLng,
     this.dropLat,
@@ -88,6 +104,14 @@ class Booking {
       'pickupAddress': pickupAddress,
       'dropAddress': dropAddress,
       'distance': distance,
+      'fromCity': fromCity,
+      'toCity': toCity,
+      'duration': duration,
+      'petFriendly': petFriendly,
+      'petCount': petCount,
+      'addons': addons,
+      'source': source,
+      'searchDetails': searchDetails,
       'pickupLat': pickupLat,
       'pickupLng': pickupLng,
       'dropLat': dropLat,
@@ -138,6 +162,14 @@ class Booking {
       pickupAddress: json['pickupAddress']?.toString() ?? '',
       dropAddress: json['dropAddress']?.toString() ?? '',
       distance: json['distance']?.toString(),
+      fromCity: json['fromCity']?.toString(),
+      toCity: json['toCity']?.toString(),
+      duration: json['duration']?.toString(),
+      petFriendly: json['petFriendly'] == true,
+      petCount: parseInt(json['petCount']),
+      addons: json['addons'] is Map<String, dynamic> ? json['addons'] : null,
+      source: json['source']?.toString() ?? 'BroomBoom App',
+      searchDetails: json['searchDetails'],
       pickupLat: json['pickupLat']?.toString(),
       pickupLng: json['pickupLng']?.toString(),
       dropLat: json['dropLat']?.toString(),

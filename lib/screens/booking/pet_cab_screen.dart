@@ -7,6 +7,7 @@ import '../home/home_screen.dart';
 import 'cab_selection_screen.dart';
 import '../../widgets/city_autocomplete_field.dart';
 import '../../theme/app_theme.dart';
+import '../../data/services/booking_service.dart';
 
 class PetCabScreen extends StatefulWidget {
   final String phoneNumber;
@@ -139,14 +140,29 @@ class _PetCabScreenState extends State<PetCabScreen> {
         return;
       }
       final pkg = _rentalPackages[_selectedPackageIndex];
+      final fromAddr = _rentalCityFullAddress ?? _rentalCityController.text.trim();
+      final toAddr = 'Local (${pkg['time']})';
+
+      BookingService.recordSearchLead(
+        pickupAddress: fromAddr,
+        dropAddress: toAddr,
+        serviceType: 'Pet Friendly Cab',
+        rentalPackage: '${pkg['hours']} hrs / ${pkg['kms']} kms',
+        pickupDate: startDate,
+        pickupTime: startTime,
+        petFriendly: true,
+        petCount: 1,
+        addons: {'petAllowance': true, 'petCount': 1, 'petType': _selectedPet},
+        customerMobile: widget.phoneNumber,
+      );
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder:
               (context) => CabSelectionScreen(
-                from:
-                    _rentalCityFullAddress ?? _rentalCityController.text.trim(),
-                to: 'Local (${pkg['time']})',
+                from: fromAddr,
+                to: toAddr,
                 fromLat: _rentalCityLat,
                 fromLng: _rentalCityLng,
                 date: startDate,
@@ -169,23 +185,33 @@ class _PetCabScreenState extends State<PetCabScreen> {
         );
         return;
       }
+      final fromAddr = _isAirportPickup
+          ? (_airportFullAddress ?? _airportController.text.trim())
+          : (_airportAddressFullAddress ?? _airportAddressController.text.trim());
+      final toAddr = _isAirportPickup
+          ? (_airportAddressFullAddress ?? _airportAddressController.text.trim())
+          : (_airportFullAddress ?? _airportController.text.trim());
+
+      BookingService.recordSearchLead(
+        pickupAddress: fromAddr,
+        dropAddress: toAddr,
+        serviceType: 'Pet Friendly Cab',
+        airportDirection: _isAirportPickup ? 'Coming from Airport' : 'Going to Airport',
+        pickupDate: startDate,
+        pickupTime: startTime,
+        petFriendly: true,
+        petCount: 1,
+        addons: {'petAllowance': true, 'petCount': 1, 'petType': _selectedPet},
+        customerMobile: widget.phoneNumber,
+      );
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder:
               (context) => CabSelectionScreen(
-                from:
-                    _isAirportPickup
-                        ? (_airportFullAddress ??
-                            _airportController.text.trim())
-                        : (_airportAddressFullAddress ??
-                            _airportAddressController.text.trim()),
-                to:
-                    _isAirportPickup
-                        ? (_airportAddressFullAddress ??
-                            _airportAddressController.text.trim())
-                        : (_airportFullAddress ??
-                            _airportController.text.trim()),
+                from: fromAddr,
+                to: toAddr,
                 fromLat: _isAirportPickup ? _airportLat : _airportAddressLat,
                 fromLng: _isAirportPickup ? _airportLng : _airportAddressLng,
                 toLat: _isAirportPickup ? _airportAddressLat : _airportLat,
@@ -209,13 +235,33 @@ class _PetCabScreenState extends State<PetCabScreen> {
         );
         return;
       }
+      final fromAddr = _fromFullAddress ?? _fromController.text.trim();
+      final toAddr = _toFullAddress ?? _toController.text.trim();
+
+      BookingService.recordSearchLead(
+        pickupAddress: fromAddr,
+        dropAddress: toAddr,
+        fromCity: _fromController.text.trim(),
+        toCity: _toController.text.trim(),
+        serviceType: 'Pet Friendly Cab',
+        wayType: _selectedServiceIndex == 0 ? 'One Way' : 'Round Way',
+        pickupDate: startDate,
+        pickupTime: startTime,
+        returnDate: _selectedServiceIndex == 1 ? endDate : null,
+        returnTime: _selectedServiceIndex == 1 ? endTime : null,
+        petFriendly: true,
+        petCount: 1,
+        addons: {'petAllowance': true, 'petCount': 1, 'petType': _selectedPet},
+        customerMobile: widget.phoneNumber,
+      );
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder:
               (context) => CabSelectionScreen(
-                from: _fromFullAddress ?? _fromController.text.trim(),
-                to: _toFullAddress ?? _toController.text.trim(),
+                from: fromAddr,
+                to: toAddr,
                 fromLat: _fromLat,
                 fromLng: _fromLng,
                 toLat: _toLat,

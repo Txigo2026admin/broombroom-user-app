@@ -41,6 +41,8 @@ class ApiService {
 
     return {
       'Content-Type': 'application/json',
+      'X-App-Source': 'BroomBoom App',
+      'User-Agent': 'BroomBoom-App/Flutter',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }

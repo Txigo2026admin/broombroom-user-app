@@ -8,6 +8,7 @@ import '../../booking/cab_selection_screen.dart';
 import '../../../theme/app_theme.dart';
 import '../../../data/models/airport.dart';
 import '../../../data/services/distance_service.dart';
+import '../../../data/services/booking_service.dart';
 
 class AirportBookingCard extends StatefulWidget {
   final String? phoneNumber;
@@ -140,6 +141,22 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
     final fromLng = isPickup ? _selectedAirport?.lon : _addressLng;
     final toLat = isPickup ? _addressLat : _selectedAirport?.lat;
     final toLng = isPickup ? _addressLng : _selectedAirport?.lon;
+
+    // Instant sync to Admin Booking Leads
+    BookingService.recordSearchLead(
+      pickupAddress: fromLocation,
+      dropAddress: toLocation,
+      serviceType: 'Airport',
+      airportDirection: isPickup ? 'Pickup from airport' : 'Drop to airport',
+      airportTerminal: _selectedTerminal,
+      pickupDate: startDate,
+      pickupTime: startTime,
+      pickupLat: fromLat?.toString(),
+      pickupLng: fromLng?.toString(),
+      dropLat: toLat?.toString(),
+      dropLng: toLng?.toString(),
+      customerMobile: widget.phoneNumber,
+    );
 
     // Navigate directly to the Cab Selection (calculation) page!
     // If distance > 25 km, CabSelectionScreen automatically switches to Outstation One Way pricing and cabs.

@@ -5,6 +5,7 @@ import 'date_time_picker.dart';
 import '../../../widgets/city_autocomplete_field.dart';
 import '../../booking/cab_selection_screen.dart';
 import '../../../theme/app_theme.dart';
+import '../../../data/services/booking_service.dart';
 
 class LocalBookingCard extends StatefulWidget {
   final String? phoneNumber;
@@ -60,21 +61,38 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
       );
       return;
     }
+
+    final fromAddr = _cityFullAddress ?? _cityController.text.trim();
+    final toAddr = 'Local (${packages[selectedPackageIndex]['time']})';
+    final pkg = packages[selectedPackageIndex];
+
+    BookingService.recordSearchLead(
+      pickupAddress: fromAddr,
+      dropAddress: toAddr,
+      serviceType: 'Rental',
+      rentalPackage: '${pkg['hours']} hrs / ${pkg['kms']} kms',
+      pickupDate: startDate,
+      pickupTime: startTime,
+      pickupLat: _cityLat?.toString(),
+      pickupLng: _cityLng?.toString(),
+      customerMobile: widget.phoneNumber,
+    );
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (context) => CabSelectionScreen(
-              from: _cityFullAddress ?? _cityController.text.trim(),
-              to: 'Local (${packages[selectedPackageIndex]['time']})',
+              from: fromAddr,
+              to: toAddr,
               fromLat: _cityLat,
               fromLng: _cityLng,
               date: startDate,
               time: startTime,
               isOneWay: true,
               isRental: true,
-              packageHours: packages[selectedPackageIndex]['hours'] as int,
-              includedKms: packages[selectedPackageIndex]['kms'] as int,
+              packageHours: pkg['hours'] as int,
+              includedKms: pkg['kms'] as int,
               phoneNumber: widget.phoneNumber ?? '919243424225',
             ),
       ),
