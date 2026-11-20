@@ -6,45 +6,148 @@ import '../../../theme/app_theme.dart';
 
 /// A sleek in-app experience review card inspired by Groww's rating prompt.
 ///
-/// Visual appearance (matches Groww exactly):
-/// - Clean white container with 16px rounded corners & subtle 1px border.
-/// - Top row: "How is your experience with BroomBroom?" with a minimalist '✕' on the right.
-/// - 5 large, elegantly spaced outline stars in slate-grey (#8C95A6).
-/// - Tapping a star fills it with rich golden-amber (#FFB400) and smoothly expands:
-///     * Emotional reaction label ("Loved it! 😍", "Great experience! 😊", etc.)
-///     * Groww-style feedback chips (e.g., "Punctual Driver", "Clean Cab", "Polite")
-///     * Optional comment field ("Tell us more... (optional)")
-///     * High-contrast "Submit Feedback" button
-///     * Animated thank-you state upon submission
+/// Can be presented as:
+/// - A center modal pop-up dialog via [ExperienceReviewCard.showPopup]
+/// - A bottom sheet modal via [ExperienceReviewCard.showAsBottomSheet]
+/// - An inline widget (e.g. on the thank-you screen)
 class ExperienceReviewCard extends StatefulWidget {
   final String appName;
   final VoidCallback? onDismissed;
   final Function(int rating, String comment)? onSubmitted;
   final EdgeInsetsGeometry? margin;
   final bool forceShow;
+  final bool isPopup;
 
   const ExperienceReviewCard({
     super.key,
-    this.appName = 'BroomBroom',
+    this.appName = 'BroomBoom cabs',
     this.onDismissed,
     this.onSubmitted,
     this.margin,
     this.forceShow = false,
+    this.isPopup = false,
   });
 
-  /// Clears stored dismissal from SharedPreferences so the card shows again.
+  /// Clears stored dismissal from SharedPreferences so the popup can show again.
   static Future<void> resetDismissal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_ExperienceReviewCardState._prefKeyDismissed);
+      await prefs.remove(_ExperienceReviewCardState._prefKeySubmitted);
+      await prefs.remove(_ExperienceReviewCardState._legacyPrefKeyDismissed);
     } catch (_) {}
+  }
+
+  /// Displays the review prompt as an elegant center pop-up dialog.
+  static Future<void> showPopup(
+    BuildContext context, {
+    String appName = 'BroomBoom cabs',
+    Function(int rating, String comment)? onSubmitted,
+    VoidCallback? onDismissed,
+    bool barrierDismissible = true,
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder:
+          (ctx) => PopScope(
+            canPop: true,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) {
+                onDismissed?.call();
+              }
+            },
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ExperienceReviewCard(
+                    appName: appName,
+                    margin: EdgeInsets.zero,
+                    forceShow: true,
+                    isPopup: true,
+                    onDismissed: () {
+                      if (ctx.mounted) {
+                        Navigator.of(ctx, rootNavigator: true).maybePop();
+                      }
+                      onDismissed?.call();
+                    },
+                    onSubmitted: (r, c) {
+                      onSubmitted?.call(r, c);
+                      Future.delayed(const Duration(milliseconds: 1400), () {
+                        if (ctx.mounted) {
+                          Navigator.of(ctx, rootNavigator: true).maybePop();
+                        }
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  /// Alias for `showPopup` for convenience.
+  static Future<void> showAsDialog(
+    BuildContext context, {
+    String appName = 'BroomBroom',
+    Function(int rating, String comment)? onSubmitted,
+    VoidCallback? onDismissed,
+    bool barrierDismissible = true,
+  }) => showPopup(
+    context,
+    appName: appName,
+    onSubmitted: onSubmitted,
+    onDismissed: onDismissed,
+    barrierDismissible: barrierDismissible,
+  );
+
+  /// Checks SharedPreferences and triggers the popup dialog if not dismissed or submitted recently.
+  static Future<bool> checkAndShowPopup(
+    BuildContext context, {
+    String appName = 'BroomBoom cabs',
+    Function(int rating, String comment)? onSubmitted,
+    bool forceShow = false,
+  }) async {
+    if (!context.mounted) return false;
+    if (!forceShow) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final submittedAt =
+            prefs.getInt(_ExperienceReviewCardState._prefKeySubmitted) ?? 0;
+        if (submittedAt > 0) return false;
+
+        final dismissedAt =
+            prefs.getInt(_ExperienceReviewCardState._prefKeyDismissed) ?? 0;
+        if (dismissedAt > 0) {
+          final diff = DateTime.now().difference(
+            DateTime.fromMillisecondsSinceEpoch(dismissedAt),
+          );
+          if (diff.inDays < 3) return false;
+        }
+      } catch (_) {}
+    }
+
+    if (!context.mounted) return false;
+    await showPopup(context, appName: appName, onSubmitted: onSubmitted);
+    return true;
   }
 
   /// Displays the review prompt as a modal bottom sheet.
   static Future<void> showAsBottomSheet(
     BuildContext context, {
-    String appName = 'BroomBroom',
+    String appName = 'BroomBoom cabs',
     Function(int rating, String comment)? onSubmitted,
+    VoidCallback? onDismissed,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -55,37 +158,58 @@ class ExperienceReviewCard extends StatefulWidget {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(ctx).viewInsets.bottom,
             ),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: kInputBorder,
-                      borderRadius: BorderRadius.circular(2),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(28),
                     ),
                   ),
-                  ExperienceReviewCard(
-                    appName: appName,
-                    margin: EdgeInsets.zero,
-                    forceShow: true,
-                    onDismissed: () => Navigator.pop(ctx),
-                    onSubmitted: (r, c) {
-                      onSubmitted?.call(r, c);
-                      Future.delayed(const Duration(milliseconds: 1400), () {
-                        if (ctx.mounted) Navigator.pop(ctx);
-                      });
-                    },
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: kInputBorder,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      ExperienceReviewCard(
+                        appName: appName,
+                        margin: EdgeInsets.zero,
+                        forceShow: true,
+                        isPopup: true,
+                        onDismissed: () {
+                          if (ctx.mounted) {
+                            Navigator.of(ctx, rootNavigator: true).maybePop();
+                          }
+                          onDismissed?.call();
+                        },
+                        onSubmitted: (r, c) {
+                          onSubmitted?.call(r, c);
+                          Future.delayed(
+                            const Duration(milliseconds: 1400),
+                            () {
+                              if (ctx.mounted) {
+                                Navigator.of(
+                                  ctx,
+                                  rootNavigator: true,
+                                ).maybePop();
+                              }
+                            },
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -97,7 +221,12 @@ class ExperienceReviewCard extends StatefulWidget {
 }
 
 class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
-  static const String _prefKeyDismissed = 'bb_experience_review_v2_dismissed_at';
+  static const String _prefKeyDismissed =
+      'bb_experience_review_popup_v1_dismissed_at';
+  static const String _prefKeySubmitted =
+      'bb_experience_review_popup_v1_submitted_at';
+  static const String _legacyPrefKeyDismissed =
+      'bb_experience_review_v2_dismissed_at';
 
   int _selectedRating = 0;
   bool _submitted = false;
@@ -118,9 +247,10 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
       final prefs = await SharedPreferences.getInstance();
       final dismissedAt = prefs.getInt(_prefKeyDismissed) ?? 0;
       if (dismissedAt > 0) {
-        final days = DateTime.now()
-            .difference(DateTime.fromMillisecondsSinceEpoch(dismissedAt))
-            .inDays;
+        final days =
+            DateTime.now()
+                .difference(DateTime.fromMillisecondsSinceEpoch(dismissedAt))
+                .inDays;
         if (days < 3 && mounted) {
           setState(() => _isDismissed = true);
         }
@@ -139,6 +269,9 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
         DateTime.now().millisecondsSinceEpoch,
       );
     } catch (_) {}
+    if (widget.isPopup && mounted) {
+      Navigator.of(context, rootNavigator: true).maybePop();
+    }
   }
 
   Future<void> _submitFeedback() async {
@@ -149,10 +282,21 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
+        _prefKeySubmitted,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      await prefs.setInt(
         _prefKeyDismissed,
         DateTime.now().millisecondsSinceEpoch,
       );
     } catch (_) {}
+    if (widget.isPopup) {
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      });
+    }
   }
 
   String _getRatingLabel(int rating) {
@@ -209,13 +353,15 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(widget.isPopup ? 22 : 16),
           border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(
+                alpha: widget.isPopup ? 0.12 : 0.04,
+              ),
+              blurRadius: widget.isPopup ? 24 : 14,
+              offset: Offset(0, widget.isPopup ? 8 : 4),
             ),
           ],
         ),
@@ -238,9 +384,10 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
           duration: const Duration(milliseconds: 320),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: _selectedRating == 0
-              ? const SizedBox.shrink()
-              : _buildRatedSection(),
+          child:
+              _selectedRating == 0
+                  ? const SizedBox.shrink()
+                  : _buildRatedSection(),
         ),
       ],
     );
@@ -248,30 +395,58 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
 
   Widget _buildHeader() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          width: 38,
+          height: 38,
+          margin: const EdgeInsets.only(right: 12),
+          decoration: BoxDecoration(
+            color: kAmberSoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.star_rounded, color: kAmberDeep, size: 24),
+        ),
         Expanded(
-          child: Text(
-            'How is your experience with ${widget.appName}?',
-            style: GoogleFonts.outfit(
-              fontSize: 18.0,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E2530),
-              height: 1.25,
-              letterSpacing: -0.25,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'How is your experience?',
+                style: GoogleFonts.outfit(
+                  fontSize: 17.5,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E2530),
+                  height: 1.2,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Rate your ride with ${widget.appName}',
+                style: GoogleFonts.outfit(
+                  fontSize: 12.0,
+                  fontWeight: FontWeight.w500,
+                  color: kInkSoft,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(width: 8),
         InkResponse(
           onTap: _dismissCard,
           radius: 18,
-          child: const Padding(
-            padding: EdgeInsets.all(4),
-            child: Icon(
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
               Icons.close_rounded,
-              size: 22,
-              color: Color(0xFF4A5568),
+              size: 18,
+              color: Color(0xFF64748B),
             ),
           ),
         ),
@@ -311,25 +486,27 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
           scale: isSelected ? 1.16 : (isFilled ? 1.05 : 1.0),
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutBack,
-          child: isFilled
-              ? ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (rect) => const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFFFCA28), Color(0xFFFF9800)],
-                  ).createShader(rect),
-                  child: const Icon(
-                    Icons.star_rounded,
+          child:
+              isFilled
+                  ? ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback:
+                        (rect) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFFFFCA28), Color(0xFFFF9800)],
+                        ).createShader(rect),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      size: 42,
+                      color: Colors.white,
+                    ),
+                  )
+                  : const Icon(
+                    Icons.star_outline_rounded,
                     size: 42,
-                    color: Colors.white,
+                    color: Color(0xFF8C95A6),
                   ),
-                )
-              : const Icon(
-                  Icons.star_outline_rounded,
-                  size: 42,
-                  color: Color(0xFF8C95A6),
-                ),
         ),
       ),
     );
@@ -456,68 +633,79 @@ class _ExperienceReviewCardState extends State<ExperienceReviewCard> {
   }
 
   Widget _buildQuickChips() {
-    final List<String> tags = _selectedRating >= 4
-        ? const [
-            'Punctual Pilot',
-            'Clean & Fresh Cab',
-            'Polite Behavior',
-            'Smooth Ride',
-            'Great Pricing',
-            'Easy App Experience',
-          ]
-        : const [
-            'Delayed Pickup',
-            'Cab Not Clean',
-            'AC / Comfort Issue',
-            'Driver Behavior',
-            'Fare Concern',
-            'App / Map Issue',
-          ];
+    final List<String> tags =
+        _selectedRating >= 4
+            ? const [
+              'Punctual Pilot',
+              'Clean & Fresh Cab',
+              'Polite Behavior',
+              'Smooth Ride',
+              'Great Pricing',
+              'Easy App Experience',
+            ]
+            : const [
+              'Delayed Pickup',
+              'Cab Not Clean',
+              'AC / Comfort Issue',
+              'Driver Behavior',
+              'Fare Concern',
+              'App / Map Issue',
+            ];
 
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       alignment: WrapAlignment.center,
-      children: tags.map((tag) {
-        final isSelected = _selectedTags.contains(tag);
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              if (isSelected) {
-                _selectedTags.remove(tag);
-              } else {
-                _selectedTags.add(tag);
-              }
-              if (_selectedTags.isNotEmpty) {
-                _commentController.text = _selectedTags.join(', ');
-              } else {
-                _commentController.clear();
-              }
-            });
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFFFFF3CD) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSelected ? kAmberDeep : const Color(0xFFE2E8F0),
-                width: isSelected ? 1.2 : 1.0,
+      children:
+          tags.map((tag) {
+            final isSelected = _selectedTags.contains(tag);
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() {
+                  if (isSelected) {
+                    _selectedTags.remove(tag);
+                  } else {
+                    _selectedTags.add(tag);
+                  }
+                  if (_selectedTags.isNotEmpty) {
+                    _commentController.text = _selectedTags.join(', ');
+                  } else {
+                    _commentController.clear();
+                  }
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected
+                          ? const Color(0xFFFFF3CD)
+                          : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? kAmberDeep : const Color(0xFFE2E8F0),
+                    width: isSelected ? 1.2 : 1.0,
+                  ),
+                ),
+                child: Text(
+                  tag,
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.0,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color:
+                        isSelected
+                            ? const Color(0xFF8B5A00)
+                            : const Color(0xFF475569),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              tag,
-              style: GoogleFonts.outfit(
-                fontSize: 12.0,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? const Color(0xFF8B5A00) : const Color(0xFF475569),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 

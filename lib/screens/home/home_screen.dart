@@ -43,6 +43,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_selectedNavIndex == 1) {
       _isOneWay = false;
     }
+    // Show experience review popup if eligible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowReviewPopup();
+    });
+  }
+
+  void _checkAndShowReviewPopup() {
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      ExperienceReviewCard.checkAndShowPopup(context);
+    });
   }
 
   String _getAppBarTitle() {
@@ -93,12 +104,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildBookingCard(),
             const SizedBox(height: 8),
-            const ExperienceReviewCard(forceShow: true),
-            const SizedBox(height: 4),
             PetCabBanner(phoneNumber: widget.phoneNumber),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             const BannersSection(),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             const ExpertSection(),
           ],
         ),

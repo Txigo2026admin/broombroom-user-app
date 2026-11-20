@@ -892,7 +892,10 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                       alignment: Alignment.centerLeft,
                       child: Text(
                         '+ ₹${((_calculatedPrices[car.name] ?? car.baseFare) * 0.05).toInt()} Taxes and Charges',
-                        style: GoogleFonts.outfit(color: kInkSoft, fontSize: 10),
+                        style: GoogleFonts.outfit(
+                          color: kInkSoft,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
                   ],
@@ -1055,10 +1058,8 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                         pricingDetails: {
                           ...?_pricingDetails[car.name],
                           'includedKms': _includedKms[car.name],
-                          'perKmRate':
-                              _perKmRates[car.name] ?? car.perKmRate,
-                          'distance':
-                              _includedKms[car.name] ?? _distance,
+                          'perKmRate': _perKmRates[car.name] ?? car.perKmRate,
+                          'distance': _includedKms[car.name] ?? _distance,
                         },
                         originalPrice: _originalPrices[car.name],
                         distance: _distance > 0 ? _distance : null,
@@ -1223,37 +1224,37 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               alignment: Alignment.centerLeft,
               child: RichText(
                 text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: boldPart,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: kInk,
-                      fontWeight: FontWeight.bold,
+                  children: [
+                    TextSpan(
+                      text: boldPart,
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: kInk,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: ' $normalPart',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: kInkSoft,
-                      fontWeight: FontWeight.w500,
+                    TextSpan(
+                      text: ' $normalPart',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: kInkSoft,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: rateBold,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: kAmberDeep,
-                      fontWeight: FontWeight.bold,
+                    TextSpan(
+                      text: rateBold,
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: kAmberDeep,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -1296,7 +1297,9 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const BookingSupportScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const BookingSupportScreen(),
+                  ),
                 );
               },
               child: _buildInfoItem(
@@ -1566,10 +1569,6 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
           _buildTabDetailItem(
             Icons.route_rounded,
             'Total kms: $kmVal kms included',
-          ),
-          _buildTabDetailItem(
-            Icons.currency_rupee_rounded,
-            'Fare rate: ₹$rateVal/km',
           ),
           if (!widget.isOneWay) ...[
             _buildTabDetailItem(

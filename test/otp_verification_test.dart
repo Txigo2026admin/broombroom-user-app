@@ -23,11 +23,21 @@ void main() {
     expect(find.text('+919876543210'), findsOneWidget);
     expect(find.text('Verify & Proceed'), findsOneWidget);
 
-    // Verify OTP input field is present and accepts digits
-    final otpFinder = find.byKey(const Key('otp_text_field'));
-    expect(otpFinder, findsOneWidget);
+    // Verify individual OTP digit input fields are present and accept digits
+    final otp0 = find.byKey(const Key('otp_field_0'));
+    final otp1 = find.byKey(const Key('otp_field_1'));
+    final otp2 = find.byKey(const Key('otp_field_2'));
+    final otp3 = find.byKey(const Key('otp_field_3'));
 
-    await tester.enterText(otpFinder, '1234');
+    expect(otp0, findsOneWidget);
+    expect(otp1, findsOneWidget);
+    expect(otp2, findsOneWidget);
+    expect(otp3, findsOneWidget);
+
+    await tester.enterText(otp0, '1');
+    await tester.enterText(otp1, '2');
+    await tester.enterText(otp2, '3');
+    await tester.enterText(otp3, '4');
     await tester.pump();
 
     expect(find.text('1'), findsOneWidget);

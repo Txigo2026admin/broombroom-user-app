@@ -1,8 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:country_picker/country_picker.dart';
+import '../../utils/url_launcher_helper.dart';
 import 'otp_verification_screen.dart';
+import '../home/home_screen.dart';
 import '../../data/services/auth_service.dart';
 import '../../theme/app_theme.dart';
 
@@ -16,16 +19,35 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
   final FocusNode _phoneFocus = FocusNode();
+  final FocusNode _emailFocus = FocusNode();
 
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   bool _agreeToTerms = false;
   Country _selectedCountry = Country.parse('IN');
 
   // Hover states
   bool _continueHovered = false;
+  bool _googleHovered = false;
   bool _countryHovered = false;
   bool _termsHovered = false;
+
+  late final TapGestureRecognizer _termsRecognizer =
+      TapGestureRecognizer()
+        ..onTap =
+            () => _launchWebUrl('https://www.broomboomcabs.com/user-terms');
+  late final TapGestureRecognizer _privacyRecognizer =
+      TapGestureRecognizer()
+        ..onTap =
+            () => _launchWebUrl('https://www.broomboomcabs.com/privacy-policy');
+
+  bool get _isIndia => AuthService.isIndiaCountry(
+    countryCode: _selectedCountry.countryCode,
+    phoneCode: _selectedCountry.phoneCode,
+  );
 
   // Entry animation
   late final AnimationController _controller = AnimationController(
@@ -66,7 +88,12 @@ class _LoginScreenState extends State<LoginScreen>
     _floatController.dispose();
     _shimmerController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
+    _nameController.dispose();
     _phoneFocus.dispose();
+    _emailFocus.dispose();
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
     super.dispose();
   }
 
@@ -111,8 +138,15 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  static final RegExp _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
   void _handleContinue() async {
     FocusScope.of(context).unfocus();
+
+    if (!_isIndia) {
+      await _handleEmailLogin();
+      return;
+    }
 
     if (_phoneController.text.length < 10) {
       _showSnack('Please enter a valid phone number');
@@ -120,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
 
     if (!_agreeToTerms) {
-      _showSnack('Please agree to the Terms & Conditions');
+      _showSnack('Please agree to the Terms & Condition and Privacy Policy');
       return;
     }
 
@@ -136,9 +170,8 @@ class _LoginScreenState extends State<LoginScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => OtpVerificationScreen(
-              phoneNumber: fullNumber,
-            ),
+            builder:
+                (context) => OtpVerificationScreen(phoneNumber: fullNumber),
           ),
         );
       } else {
@@ -147,8 +180,166 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  /// Validates optional phone entry for outside-India countries.
+  /// Returns `''` when omitted, `'+<code><digits>'` when valid, or `null` if invalid.
+  String? _resolveOptionalInternationalPhone() {
+    final digits = _phoneController.text.trim();
+    if (digits.isEmpty) return '';
+    if (digits.length < 6 || digits.length > 15) {
+      _showSnack(
+        'Please enter a valid mobile number (6 to 15 digits) or leave it blank.',
+      );
+      return null;
+    }
+    return '+${_selectedCountry.phoneCode}$digits';
+  }
+
+  Future<void> _handleEmailLogin() async {
+    FocusScope.of(context).unfocus();
+
+    final email = _emailController.text.trim();
+    if (!_emailRegex.hasMatch(email)) {
+      _showSnack('Please enter a valid email address');
+      _emailFocus.requestFocus();
+      return;
+    }
+
+    final optionalPhone = _resolveOptionalInternationalPhone();
+    if (optionalPhone == null) return;
+
+    if (!_agreeToTerms) {
+      _showSnack('Please agree to the Terms & Condition and Privacy Policy');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final result = await AuthService.loginWithEmail(
+      email: email,
+      name: _nameController.text.trim(),
+      phone: optionalPhone,
+      countryCode: _selectedCountry.countryCode,
+      dialCode: '+${_selectedCountry.phoneCode}',
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result.success) {
+      _navigateToHome(result.phoneNumber);
+    } else {
+      _showSnack(result.message ?? 'Email login failed. Please try again.');
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    FocusScope.of(context).unfocus();
+
+    final optionalPhone = _resolveOptionalInternationalPhone();
+    if (optionalPhone == null) return;
+
+    if (!_agreeToTerms) {
+      _showSnack('Please agree to the Terms & Condition and Privacy Policy');
+      return;
+    }
+
+    setState(() => _isGoogleLoading = true);
+
+    final result = await AuthService.signInWithGoogle(
+      phone: optionalPhone,
+      countryCode: _selectedCountry.countryCode,
+      dialCode: '+${_selectedCountry.phoneCode}',
+    );
+
+    if (!mounted) return;
+    setState(() => _isGoogleLoading = false);
+
+    if (result.success) {
+      _navigateToHome(result.phoneNumber);
+    } else if (result.needsGoogleConfig) {
+      _showGoogleSetupDialog(result.message);
+    } else {
+      _showSnack(result.message ?? 'Google sign-in failed. Please try again.');
+    }
+  }
+
+  void _navigateToHome(String phoneNumber) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(phoneNumber: phoneNumber),
+      ),
+      (route) => false,
+    );
+  }
+
+  void _showGoogleSetupDialog(String? message) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: kCardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Google Sign-In Setup Needed',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w700,
+                color: kInk,
+              ),
+            ),
+            content: Text(
+              message ??
+                  'Google OAuth Client ID is not configured yet for this app build. You can verify using your Email ID right now.',
+              style: GoogleFonts.outfit(color: kInkSoft, fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Close',
+                  style: GoogleFonts.outfit(color: kInkSoft),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kAmber,
+                  foregroundColor: kInk,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _emailFocus.requestFocus();
+                },
+                child: Text(
+                  'Use Email ID',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _launchWebUrl(String urlString) async {
+    try {
+      final launched = await UrlLauncherHelper.openUrl(urlString);
+      if (!launched && mounted) {
+        _showSnack('Could not open link');
+      }
+    } catch (e) {
+      debugPrint('Error launching URL $urlString: $e');
+      if (mounted) {
+        _showSnack('Could not open link');
+      }
+    }
   }
 
   // ───────────────────────────── UI ─────────────────────────────
@@ -429,7 +620,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'PHONE NUMBER',
+                  _isIndia ? 'PHONE NUMBER' : 'MOBILE NUMBER (OPTIONAL)',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -448,8 +639,13 @@ class _LoginScreenState extends State<LoginScreen>
                 Expanded(child: _buildPhoneField()),
               ],
             ),
-            const SizedBox(height: 22),
-            _buildContinueButton(),
+            if (_isIndia) ...[
+              const SizedBox(height: 22),
+              _buildContinueButton(),
+            ] else ...[
+              const SizedBox(height: 14),
+              _buildOutsideIndiaSection(),
+            ],
           ],
         ),
       ),
@@ -565,25 +761,274 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ── Continue button with hover (scale + lift + glow) ───────────────
-  Widget _buildContinueButton() {
+  Widget _buildOutsideIndiaSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: kAmberSoft.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kInputBorder),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.verified_user_outlined,
+                color: kAmberDeep,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No SMS OTP needed outside India. Verify using Email ID or Google.',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: kInk,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildFieldLabel('EMAIL ID'),
+        const SizedBox(height: 8),
+        _buildStyledTextField(
+          controller: _emailController,
+          focusNode: _emailFocus,
+          hintText: 'Enter your email address',
+          keyboardType: TextInputType.emailAddress,
+          prefixIcon: Icons.email_outlined,
+        ),
+        const SizedBox(height: 14),
+        _buildFieldLabel('FULL NAME (OPTIONAL)'),
+        const SizedBox(height: 8),
+        _buildStyledTextField(
+          controller: _nameController,
+          hintText: 'Enter your name',
+          keyboardType: TextInputType.name,
+          prefixIcon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 20),
+        _buildPrimaryActionButton(
+          label: 'Continue with Email',
+          isLoading: _isLoading,
+          onTap: (_isLoading || _isGoogleLoading) ? null : _handleEmailLogin,
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Divider(color: kInputBorder.withValues(alpha: 0.9)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                'OR',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kInkSoft,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Divider(color: kInputBorder.withValues(alpha: 0.9)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildGoogleButton(),
+      ],
+    );
+  }
+
+  Widget _buildFieldLabel(String text) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: const BoxDecoration(
+            color: kAmberDeep,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.5,
+            color: kInkSoft,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStyledTextField({
+    required TextEditingController controller,
+    FocusNode? focusNode,
+    required String hintText,
+    required TextInputType keyboardType,
+    required IconData prefixIcon,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      keyboardType: keyboardType,
+      style: GoogleFonts.outfit(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: kInk,
+      ),
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: GoogleFonts.outfit(
+          color: kInkSoft.withValues(alpha: 0.6),
+          fontWeight: FontWeight.w400,
+        ),
+        prefixIcon: Icon(prefixIcon, color: kAmberDeep, size: 20),
+        filled: true,
+        fillColor: kInputBg,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: kInputBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: kInputBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: kAmberDeep, width: 2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    final disabled = _isLoading || _isGoogleLoading;
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _continueHovered = true),
-      onExit: (_) => setState(() => _continueHovered = false),
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _googleHovered = true),
+      onExit: (_) => setState(() => _googleHovered = false),
       child: AnimatedScale(
-        scale: _continueHovered && !_isLoading ? 1.02 : 1.0,
+        scale: _googleHovered && !disabled ? 1.015 : 1.0,
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         child: GestureDetector(
-          onTap: _isLoading ? null : _handleContinue,
+          onTap: disabled ? null : _handleGoogleLogin,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            height: 54,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: _googleHovered && !disabled ? kInputBg : kCardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _googleHovered ? kAmberDeep : kInputBorder,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child:
+                  _isGoogleLoading
+                      ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          valueColor: AlwaysStoppedAnimation<Color>(kAmberDeep),
+                        ),
+                      )
+                      : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.black.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Center(
+                              child: CustomPaint(
+                                size: const Size(16, 16),
+                                painter: _GoogleLogoPainter(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Continue with Google',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: kInk,
+                            ),
+                          ),
+                        ],
+                      ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Continue button with hover (scale + lift + glow) ───────────────
+  Widget _buildContinueButton() {
+    return _buildPrimaryActionButton(
+      label: 'Continue',
+      isLoading: _isLoading,
+      onTap: _isLoading ? null : _handleContinue,
+    );
+  }
+
+  Widget _buildPrimaryActionButton({
+    required String label,
+    required bool isLoading,
+    required VoidCallback? onTap,
+  }) {
+    return MouseRegion(
+      cursor:
+          onTap == null ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _continueHovered = true),
+      onExit: (_) => setState(() => _continueHovered = false),
+      child: AnimatedScale(
+        scale: _continueHovered && !isLoading ? 1.02 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        child: GestureDetector(
+          onTap: onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             height: 58,
             width: double.infinity,
             decoration: BoxDecoration(
               gradient:
-                  _isLoading
+                  isLoading
                       ? null
                       : LinearGradient(
                         begin: Alignment.centerLeft,
@@ -601,10 +1046,10 @@ class _LoginScreenState extends State<LoginScreen>
                                   kAmberDeep,
                                 ],
                       ),
-              color: _isLoading ? kAmberSoft : null,
+              color: isLoading ? kAmberSoft : null,
               borderRadius: BorderRadius.circular(18),
               boxShadow:
-                  _isLoading
+                  isLoading
                       ? []
                       : [
                         BoxShadow(
@@ -618,7 +1063,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             child: Center(
               child:
-                  _isLoading
+                  isLoading
                       ? const SizedBox(
                         height: 24,
                         width: 24,
@@ -631,7 +1076,7 @@ class _LoginScreenState extends State<LoginScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Continue',
+                            label,
                             style: GoogleFonts.outfit(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -706,17 +1151,48 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 3.0),
-                child: Text(
-                  'I agree to the Terms & Conditions',
-                  textAlign: TextAlign.left,
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    height: 1.4,
-                    color: _termsHovered ? kAmberDeep : kInkSoft,
-                    fontWeight:
-                        _termsHovered ? FontWeight.w600 : FontWeight.w400,
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 3.0),
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'I agree to the ',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: _termsHovered ? kAmberDeep : kInkSoft,
+                        fontWeight:
+                            _termsHovered ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: 'Terms & Conditions',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: kAmberDeep,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                            decorationColor: kAmberDeep,
+                          ),
+                          recognizer: _termsRecognizer,
+                        ),
+                        const TextSpan(text: ' and '),
+                        TextSpan(
+                          text: 'Privacy Policy',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: kAmberDeep,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                            decorationColor: kAmberDeep,
+                          ),
+                          recognizer: _privacyRecognizer,
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.left,
                   ),
                 ),
               ),
@@ -726,4 +1202,51 @@ class _LoginScreenState extends State<LoginScreen>
       ),
     );
   }
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double strokeWidth = size.width * 0.22;
+    final Rect rect = Offset.zero & size;
+    final Rect arcRect = rect.deflate(strokeWidth / 2);
+
+    final paint =
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.butt;
+
+    // Red top arc
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawArc(arcRect, -2.55, 1.85, false, paint);
+
+    // Yellow left arc
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(arcRect, 2.35, 1.4, false, paint);
+
+    // Green bottom arc
+    paint.color = const Color(0xFF34A853);
+    canvas.drawArc(arcRect, 0.55, 1.85, false, paint);
+
+    // Blue right arc
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawArc(arcRect, -0.1, 0.72, false, paint);
+
+    // Blue horizontal bar
+    final barPaint =
+        Paint()
+          ..color = const Color(0xFF4285F4)
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.butt;
+    final double cy = size.height / 2;
+    canvas.drawLine(
+      Offset(size.width * 0.5, cy),
+      Offset(size.width * 0.96, cy),
+      barPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

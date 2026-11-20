@@ -73,6 +73,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   late TextEditingController _pickupLocationController;
   late TextEditingController _dropLocationController;
   late TextEditingController _phoneController;
+  String _displayDialCode = '+91';
 
   // Add-on States
   bool _includeExpressway = false;
@@ -99,7 +100,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     if (widget.distance != null && widget.distance! > 0) {
       return widget.distance!.toStringAsFixed(1);
     }
-    final d = widget.pricingDetails?['distance'] ??
+    final d =
+        widget.pricingDetails?['distance'] ??
         widget.pricingDetails?['includedKms'] ??
         widget.pricingDetails?['billableKms'];
     return d?.toString();
@@ -109,7 +111,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     if (widget.duration != null && widget.duration!.isNotEmpty) {
       return widget.duration;
     }
-    final dur = widget.pricingDetails?['duration'] ??
+    final dur =
+        widget.pricingDetails?['duration'] ??
         widget.pricingDetails?['totalHours'];
     if (dur != null) return '$dur hrs';
     return null;
@@ -150,17 +153,31 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   Future<void> _loadUserData() async {
     final name = await AuthService.getUserName();
     final savedPhone = await AuthService.getUserPhone();
+    final savedEmail = await AuthService.getUserEmail();
+    final savedDialCode = await AuthService.getUserDialCode();
     if (mounted) {
       setState(() {
+        if (savedDialCode != null && savedDialCode.trim().isNotEmpty) {
+          _displayDialCode = savedDialCode.trim();
+        }
         if (name != null &&
             name.isNotEmpty &&
             name != 'New User' &&
             _nameController.text.isEmpty) {
           _nameController.text = name;
         }
-        if (_phoneController.text.isEmpty && savedPhone != null) {
-          String p = savedPhone;
-          if (p.startsWith('+91')) {
+        if (savedEmail != null &&
+            savedEmail.isNotEmpty &&
+            _emailController.text.isEmpty) {
+          _emailController.text = savedEmail;
+        }
+        final sourcePhone =
+            _phoneController.text.isEmpty ? savedPhone : _phoneController.text;
+        if (sourcePhone != null && sourcePhone.isNotEmpty) {
+          String p = sourcePhone.trim();
+          if (_displayDialCode != '+91' && p.startsWith(_displayDialCode)) {
+            p = p.substring(_displayDialCode.length);
+          } else if (p.startsWith('+91')) {
             p = p.substring(3);
           } else if (p.startsWith('91') && p.length > 10) {
             p = p.substring(2);
@@ -171,21 +188,29 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
       // Record this booking review as an active lead in the admin panel
       final rawPrice =
-          double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0.0;
+          double.tryParse(widget.price.replaceAll(RegExp(r'[^0-9]'), '')) ??
+          0.0;
       BookingService.recordSearchLead(
         pickupAddress: widget.from,
         dropAddress: widget.to,
-        fromCity: widget.from.contains(',') ? widget.from.split(',')[0].trim() : widget.from,
-        toCity: widget.to.contains(',') ? widget.to.split(',')[0].trim() : widget.to,
+        fromCity:
+            widget.from.contains(',')
+                ? widget.from.split(',')[0].trim()
+                : widget.from,
+        toCity:
+            widget.to.contains(',')
+                ? widget.to.split(',')[0].trim()
+                : widget.to,
         distance: _resolvedDistance,
         duration: _resolvedDuration,
-        serviceType: widget.isAirport
-            ? 'Airport'
-            : (widget.isRental
-                ? 'Rental'
-                : (widget.isOneWay
-                    ? 'Outstation oneway'
-                    : 'Outstation roundtrip')),
+        serviceType:
+            widget.isAirport
+                ? 'Airport'
+                : (widget.isRental
+                    ? 'Rental'
+                    : (widget.isOneWay
+                        ? 'Outstation oneway'
+                        : 'Outstation roundtrip')),
         wayType: widget.isOneWay ? 'One Way' : 'Round Way',
         airportDirection: widget.airportDirection,
         airportTerminal: widget.airportTerminal,
@@ -199,7 +224,10 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         petFriendly: _includePet,
         petCount: _petCount,
         customerName: name ?? 'App User',
-        customerMobile: _phoneController.text.isNotEmpty ? _phoneController.text : (savedPhone ?? widget.phoneNumber),
+        customerMobile:
+            _phoneController.text.isNotEmpty
+                ? _phoneController.text
+                : (savedPhone ?? widget.phoneNumber),
       );
     }
   }
@@ -288,10 +316,16 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         _nameController.text.trim().isNotEmpty
             ? _nameController.text.trim()
             : 'Customer';
-    final String phone =
+    final String rawPhone =
         _phoneController.text.trim().isNotEmpty
             ? _phoneController.text.trim()
             : widget.phoneNumber;
+    final String phone =
+        (_displayDialCode != '+91' &&
+                rawPhone.isNotEmpty &&
+                !rawPhone.startsWith('+'))
+            ? '$_displayDialCode$rawPhone'
+            : rawPhone;
 
     if (pickup.isEmpty || drop.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -803,7 +837,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '+91',
+                      _displayDialCode,
                       style: GoogleFonts.outfit(
                         color: kInk,
                         fontWeight: FontWeight.bold,
@@ -1381,8 +1415,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           lowerName.contains('innova') ||
           lowerName.contains('ertiga')) {
         perKmVal = 18;
-      } else if (lowerName.contains('tempo') ||
-          lowerName.contains('urbania')) {
+      } else if (lowerName.contains('tempo') || lowerName.contains('urbania')) {
         perKmVal = 26;
       } else {
         perKmVal = 12;
@@ -1466,11 +1499,6 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
               'Total kms: $totalKmsStr included',
               true,
             ),
-            _buildInclusionPoint(
-              Icons.currency_rupee_rounded,
-              'Fare rate: ₹$perKmVal/km',
-              true,
-            ),
           ],
           const SizedBox(height: 8),
           Divider(color: kInputBorder.withValues(alpha: 0.6)),
@@ -1537,8 +1565,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   Widget _buildInclusionPoint(IconData icon, String text, bool isIncluded) {
     final color =
         isIncluded ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
-    final bg =
-        isIncluded ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE);
+    final bg = isIncluded ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 7.0),
@@ -1548,15 +1575,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           Container(
             margin: const EdgeInsets.only(top: 2),
             padding: const EdgeInsets.all(4.5),
-            decoration: BoxDecoration(
-              color: bg,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 13,
-              color: color,
-            ),
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, size: 13, color: color),
           ),
           const SizedBox(width: 8),
           Expanded(

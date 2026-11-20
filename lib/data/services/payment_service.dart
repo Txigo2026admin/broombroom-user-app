@@ -68,48 +68,72 @@ class PaymentStatusResult {
     return PaymentStatusResult(
       success: json['success'] == true,
       bookingId: json['bookingId'],
-      paymentStatus: (json['paymentStatus'] ?? 'PENDING').toString().toUpperCase(),
+      paymentStatus:
+          (json['paymentStatus'] ?? 'PENDING').toString().toUpperCase(),
       paidAmount: (json['paidAmount'] ?? 0).toDouble(),
       paymentMethod: json['paymentMethod'],
       fare: (json['fare'] ?? 0).toDouble(),
       advance: (json['advance'] ?? 0).toDouble(),
       dueFare: (json['dueFare'] ?? 0).toDouble(),
       message: json['message'],
-      booking: json['booking'] != null ? Booking.fromJson(json['booking']) : null,
+      booking:
+          json['booking'] != null ? Booking.fromJson(json['booking']) : null,
     );
   }
 }
 
 class PaymentService {
-  /// Calls POST /api/payment/create-order
   static Future<PaymentOrderResult> createPaymentOrder(
     String bookingId, {
     String? returnUrl,
   }) async {
     try {
+      // Always use the production HTTPS payment return URL.
       final effectiveReturnUrl =
-          returnUrl ?? (kIsWeb ? Uri.base.origin : null);
+          returnUrl ?? 'https://www.broomboomcabs.com/payment/success';
+
+      final uri = Uri.tryParse(effectiveReturnUrl);
+
+      if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+        return PaymentOrderResult(
+          success: false,
+          message: 'Invalid payment return URL. HTTPS is required.',
+        );
+      }
+
+      if (kDebugMode) {
+        debugPrint('Creating payment order: $bookingId');
+        debugPrint('Payment return URL: $effectiveReturnUrl');
+      }
 
       final response = await ApiService.post('/payment/create-order', {
         'bookingId': bookingId,
-        if (effectiveReturnUrl != null && effectiveReturnUrl.isNotEmpty)
-          'returnUrl': effectiveReturnUrl,
+        'returnUrl': effectiveReturnUrl,
       });
 
+      final data = jsonDecode(response.body);
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
         return PaymentOrderResult.fromJson(data);
-      } else {
-        final data = jsonDecode(response.body);
-        return PaymentOrderResult(
-          success: false,
-          message: data['message'] ?? 'Failed to create payment order',
-        );
       }
+
+      if (kDebugMode) {
+        debugPrint('Payment API status: ${response.statusCode}');
+        debugPrint('Payment API response: ${response.body}');
+      }
+
+      return PaymentOrderResult(
+        success: false,
+        message:
+            data['message'] ??
+            data['error'] ??
+            'Failed to create payment order',
+      );
     } catch (e) {
       if (kDebugMode) {
-        print('Error in createPaymentOrder: $e');
+        debugPrint('Error in createPaymentOrder: $e');
       }
+
       return PaymentOrderResult(
         success: false,
         message: 'Connection error: $e',
@@ -118,7 +142,9 @@ class PaymentService {
   }
 
   /// Calls GET /api/payment/status/:bookingId
-  static Future<PaymentStatusResult> checkPaymentStatus(String bookingId) async {
+  static Future<PaymentStatusResult> checkPaymentStatus(
+    String bookingId,
+  ) async {
     try {
       final response = await ApiService.get('/payment/status/$bookingId');
       if (response.statusCode == 200) {

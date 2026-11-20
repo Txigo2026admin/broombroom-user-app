@@ -101,7 +101,12 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               children: [
                 _buildInputField('NAME', _userName),
                 const SizedBox(height: 18),
-                _buildInputField('MOBILE', widget.phoneNumber),
+                _buildInputField(
+                  'MOBILE',
+                  widget.phoneNumber.trim().isEmpty
+                      ? 'Not linked'
+                      : widget.phoneNumber,
+                ),
                 const SizedBox(height: 18),
                 _buildInputField('EMAIL', _email),
                 const SizedBox(height: 28),
@@ -118,7 +123,11 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                     child: Center(
                       child: Text(
                         'Update Details',
-                        style: GoogleFonts.outfit(color: kInk, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: GoogleFonts.outfit(
+                          color: kInk,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -129,10 +138,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                   children: [
                     TextButton.icon(
                       onPressed: _handleLogout,
-                      icon: const Icon(Icons.logout_rounded, color: kAmberDeep, size: 18),
+                      icon: const Icon(
+                        Icons.logout_rounded,
+                        color: kAmberDeep,
+                        size: 18,
+                      ),
                       label: Text(
                         'Sign Out',
-                        style: GoogleFonts.outfit(color: kAmberDeep, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.outfit(
+                          color: kAmberDeep,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     TextButton(
@@ -171,9 +187,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
                     children: [
                       Text(
                         'mail us at $_supportEmail, or call us at ',
-                        style: GoogleFonts.outfit(color: kInk, fontSize: 11, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.outfit(
+                          color: kInk,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      const Icon(Icons.call_rounded, color: kAmberDeep, size: 13),
+                      const Icon(
+                        Icons.call_rounded,
+                        color: kAmberDeep,
+                        size: 13,
+                      ),
                       Text(
                         ' $_supportPhone.',
                         style: GoogleFonts.outfit(
@@ -221,14 +245,19 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
               isDense: true,
               contentPadding: EdgeInsets.zero,
               hintText: value,
-              hintStyle: GoogleFonts.outfit(color: kInkSoft.withValues(alpha: 0.6)),
+              hintStyle: GoogleFonts.outfit(
+                color: kInkSoft.withValues(alpha: 0.6),
+              ),
               border: InputBorder.none,
             ),
-            style: GoogleFonts.outfit(color: kInk, fontSize: 15, fontWeight: FontWeight.w600),
+            style: GoogleFonts.outfit(
+              color: kInk,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
   }
 }
-

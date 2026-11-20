@@ -174,7 +174,7 @@ class AccountScreen extends StatelessWidget {
           ),
           onTap: () {
           if (title == 'Rate your experience') {
-            ExperienceReviewCard.showAsBottomSheet(context);
+            ExperienceReviewCard.showPopup(context);
             return;
           }
           Widget nextScreen;

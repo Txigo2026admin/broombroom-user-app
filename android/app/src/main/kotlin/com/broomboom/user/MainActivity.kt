@@ -1,4 +1,4 @@
-package com.example.broomboom_user_app
+package com.broomboom.user
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -6,21 +6,61 @@ import '../../data/services/auth_service.dart';
 import '../../theme/app_theme.dart';
 import '../home/home_screen.dart';
 
+/// Keeps a single digit in a box. If several digits arrive at once (paste /
+/// SMS autofill) they are handed to [onPaste] so they can be spread across
+/// the remaining boxes instead of being thrown away.
+class _OtpDigitInputFormatter extends TextInputFormatter {
+  _OtpDigitInputFormatter({required this.onPaste});
+
+  final ValueChanged<String> onPaste;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+
+    if (digits.length > 1) {
+      onPaste(digits);
+      return oldValue;
+    }
+
+    // Always keep the caret after the single digit so typing over a filled
+    // box simply replaces its value.
+    return TextEditingValue(
+      text: digits,
+      selection: const TextSelection.collapsed(offset: 1),
+    );
+  }
+}
+
 class OtpVerificationScreen extends StatefulWidget {
   final String phoneNumber;
 
-  const OtpVerificationScreen({
-    super.key,
-    required this.phoneNumber,
-  });
+  const OtpVerificationScreen({super.key, required this.phoneNumber});
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final TextEditingController _pinController = TextEditingController();
-  final FocusNode _pinFocusNode = FocusNode();
+  static const int _otpLength = 4;
+
+  /// One controller + one focus node per box, so every box can be edited
+  /// independently and in any order.
+  final List<TextEditingController> _otpControllers = List.generate(
+    _otpLength,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _otpFocusNodes = List.generate(
+    _otpLength,
+    (_) => FocusNode(),
+  );
 
   bool _isVerifying = false;
   bool _isResending = false;
@@ -28,16 +68,111 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Timer? _resendTimer;
   int _secondsRemaining = 30;
 
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
   @override
   void initState() {
     super.initState();
     _startResendTimer();
-    _pinFocusNode.addListener(_onFocusChange);
+    for (var i = 0; i < _otpLength; i++) {
+      _otpFocusNodes[i].addListener(_onBoxFocusChange);
+    }
   }
 
-  void _onFocusChange() {
+  void _onBoxFocusChange() {
     if (mounted) setState(() {});
   }
+
+  @override
+  void dispose() {
+    _resendTimer?.cancel();
+    for (final node in _otpFocusNodes) {
+      node.removeListener(_onBoxFocusChange);
+      node.dispose();
+    }
+    for (final controller in _otpControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // OTP helpers
+  // ---------------------------------------------------------------------------
+
+  String get _otpCode => _otpControllers.map((c) => c.text).join();
+
+  bool get _isOtpComplete =>
+      _otpControllers.every((c) => c.text.trim().isNotEmpty);
+
+  /// Focus a specific box (used by taps, auto-advance and back-space hop).
+  void _focusBox(int index) {
+    if (index < 0 || index >= _otpLength) return;
+    _otpFocusNodes[index].requestFocus();
+  }
+
+  void _onOtpChanged(int index, String value) {
+    setState(() {});
+
+    // Box was emptied -> hop back so the user can keep deleting.
+    if (value.isEmpty) {
+      if (index > 0) _focusBox(index - 1);
+      return;
+    }
+
+    // All boxes filled -> verify straight away.
+    if (_isOtpComplete) {
+      FocusScope.of(context).unfocus();
+      if (!_isVerifying) _verifyOtp();
+      return;
+    }
+
+    // Otherwise jump to the next box (skips nothing – the user can still
+    // tap any box at any time).
+    if (index < _otpLength - 1) {
+      _focusBox(index + 1);
+    }
+  }
+
+  /// Called from the formatter when a multi-digit string is pasted.
+  void _handlePaste(String digits) {
+    // The formatter runs inside the text-input update, so defer the state
+    // mutation to the next micro-task.
+    Future.microtask(() {
+      if (!mounted) return;
+      _fillOtp(digits);
+    });
+  }
+
+  void _fillOtp(String digits) {
+    final clean = digits.replaceAll(RegExp(r'\D'), '');
+    for (var i = 0; i < _otpLength; i++) {
+      _otpControllers[i].text = i < clean.length ? clean[i] : '';
+    }
+    setState(() {});
+
+    if (_isOtpComplete) {
+      FocusScope.of(context).unfocus();
+      if (!_isVerifying) _verifyOtp();
+    } else {
+      _focusBox(clean.length.clamp(0, _otpLength - 1));
+    }
+  }
+
+  void _clearOtp() {
+    for (final controller in _otpControllers) {
+      controller.clear();
+    }
+    if (!mounted) return;
+    setState(() {});
+    _focusBox(0);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resend timer
+  // ---------------------------------------------------------------------------
 
   void _startResendTimer() {
     _resendTimer?.cancel();
@@ -56,15 +191,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _resendTimer?.cancel();
-    _pinFocusNode.removeListener(_onFocusChange);
-    _pinController.dispose();
-    _pinFocusNode.dispose();
-    super.dispose();
-  }
-
   Future<void> _handleResendOtp() async {
     if (_secondsRemaining > 0 || _isResending) return;
 
@@ -76,6 +202,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
       if (res.success) {
         _startResendTimer();
+        _clearOtp();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res.message ?? 'New 4-digit OTP sent to your phone!'),
@@ -85,7 +212,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(res.message ?? 'Failed to resend OTP. Please try again.'),
+            content: Text(
+              res.message ?? 'Failed to resend OTP. Please try again.',
+            ),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -105,10 +234,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
   }
 
-  Future<void> _verifyOtp() async {
-    final otp = _pinController.text.trim();
+  // ---------------------------------------------------------------------------
+  // Verification
+  // ---------------------------------------------------------------------------
 
-    if (otp.length != 4) {
+  Future<void> _verifyOtp() async {
+    if (_isVerifying) return;
+
+    final otp = _otpCode;
+
+    if (!_isOtpComplete || otp.length != _otpLength) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -119,6 +254,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
     setState(() => _isVerifying = true);
 
     try {
@@ -129,13 +265,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.message ?? 'Mobile number verified successfully!'),
+            content: Text(
+              result.message ?? 'Mobile number verified successfully!',
+            ),
             backgroundColor: const Color(0xFF2E7D32),
             duration: const Duration(seconds: 2),
           ),
         );
 
-        // Navigate to HomeScreen and clear auth stack
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
@@ -144,17 +281,19 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           (route) => false,
         );
       } else {
-        _pinController.clear();
+        _clearOtp();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.message ?? 'Invalid OTP. Please check and try again.'),
+            content: Text(
+              result.message ?? 'Invalid OTP. Please check and try again.',
+            ),
             backgroundColor: Colors.red.shade700,
           ),
         );
       }
     } catch (error) {
       if (!mounted) return;
-      _pinController.clear();
+      _clearOtp();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Verification failed: $error'),
@@ -168,93 +307,88 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
   Widget _buildOtpInputFields() {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Hidden TextField that captures keyboard, paste, and auto-advance
-        Opacity(
-          opacity: 0.0,
-          child: SizedBox(
-            width: 280,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(_otpLength, (index) {
+        final isFilled = _otpControllers[index].text.isNotEmpty;
+        final isFocused = _otpFocusNodes[index].hasFocus;
+
+        return GestureDetector(
+          key: Key('otp_box_$index'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _focusBox(index),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 60,
             height: 60,
-            child: TextField(
-              key: const Key('otp_text_field'),
-              controller: _pinController,
-              focusNode: _pinFocusNode,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(4),
+            margin: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color:
+                  isFilled
+                      ? kAmberSoft.withValues(alpha: 0.45)
+                      : (isFocused ? Colors.white : kInputBg),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color:
+                    isFocused
+                        ? kAmberDeep
+                        : (isFilled ? kAmberDeep : kInputBorder),
+                width: isFocused ? 2.0 : 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      isFocused
+                          ? kAmber.withValues(alpha: 0.25)
+                          : kAmber.withValues(alpha: 0.08),
+                  blurRadius: isFocused ? 14 : 10,
+                  offset: const Offset(0, 4),
+                ),
               ],
-              autofocus: true,
-              showCursor: false,
+            ),
+            child: TextField(
+              key: Key('otp_field_$index'),
+              controller: _otpControllers[index],
+              focusNode: _otpFocusNodes[index],
+              autofocus: index == 0,
+              keyboardType: TextInputType.number,
+              textInputAction:
+                  index == _otpLength - 1
+                      ? TextInputAction.done
+                      : TextInputAction.next,
+              textAlign: TextAlign.center,
+              cursorColor: kAmberDeep,
+              cursorWidth: 2,
               enableSuggestions: false,
               autocorrect: false,
-              onChanged: (val) {
-                setState(() {});
-                if (val.length == 4) {
-                  _verifyOtp();
-                }
+              enableInteractiveSelection: false,
+              style: GoogleFonts.outfit(
+                fontSize: 24,
+                color: kInk,
+                fontWeight: FontWeight.bold,
+              ),
+              inputFormatters: [_OtpDigitInputFormatter(onPaste: _handlePaste)],
+              decoration: const InputDecoration(
+                isCollapsed: true,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+              onChanged: (value) => _onOtpChanged(index, value),
+              onSubmitted: (_) {
+                if (_isOtpComplete && !_isVerifying) _verifyOtp();
               },
             ),
           ),
-        ),
-        // 4 Stylized OTP Digit Boxes
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            _pinFocusNode.requestFocus();
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(4, (index) {
-              final text = _pinController.text;
-              final isFilled = index < text.length;
-              final char = isFilled ? text[index] : '';
-              final isCurrent = index == text.length;
-              final isFocused = _pinFocusNode.hasFocus &&
-                  (isCurrent || (index == 3 && text.length == 4));
-
-              return Container(
-                width: 60,
-                height: 60,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: isFilled
-                      ? kAmberSoft.withValues(alpha: 0.45)
-                      : (isFocused ? Colors.white : kInputBg),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isFocused
-                        ? kAmberDeep
-                        : (isFilled ? kAmberDeep : kInputBorder),
-                    width: isFocused ? 2.0 : 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isFocused
-                          ? kAmber.withValues(alpha: 0.25)
-                          : kAmber.withValues(alpha: 0.08),
-                      blurRadius: isFocused ? 14 : 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  char,
-                  style: GoogleFonts.outfit(
-                    fontSize: 24,
-                    color: kInk,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ],
+        );
+      }),
     );
   }
 
@@ -276,9 +410,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Material(
-              color: Colors.transparent,
-              child: Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 10),
@@ -347,7 +479,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.phone_iphone_rounded, size: 18, color: kInkSoft),
+                      const Icon(
+                        Icons.phone_iphone_rounded,
+                        size: 18,
+                        color: kInkSoft,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         widget.phoneNumber,
@@ -362,11 +498,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            Navigator.pop(context); // Go back to login to edit number
+                            Navigator.pop(context);
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
                             child: Text(
                               "Edit",
                               style: GoogleFonts.outfit(
@@ -384,7 +523,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
                 const SizedBox(height: 40),
 
-                // 4-Digit Native PIN Input
+                // 4 independent OTP boxes – tap any box to fill it
                 _buildOtpInputFields(),
 
                 const SizedBox(height: 32),
@@ -395,10 +534,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   children: [
                     Text(
                       "Didn't receive code? ",
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        color: kInkSoft,
-                      ),
+                      style: GoogleFonts.outfit(fontSize: 14, color: kInkSoft),
                     ),
                     if (_secondsRemaining > 0)
                       Text(
@@ -438,30 +574,31 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       borderRadius: BorderRadius.circular(16),
                       onTap: _isVerifying ? null : _verifyOtp,
                       child: Center(
-                        child: _isVerifying
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: kInk,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "Verify & Proceed",
-                                    style: kButtonTextStyle(size: 17),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  const Icon(
-                                    Icons.arrow_forward_rounded,
+                        child:
+                            _isVerifying
+                                ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
                                     color: kInk,
-                                    size: 20,
+                                    strokeWidth: 2.5,
                                   ),
-                                ],
-                              ),
+                                )
+                                : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "Verify & Proceed",
+                                      style: kButtonTextStyle(size: 17),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      color: kInk,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
                       ),
                     ),
                   ),
@@ -473,7 +610,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           ),
         ),
       ),
-    ),
-  );
+    );
   }
 }

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ApiService {
   // Live production backend URL (where admin prices are updated)
   static const String _productionApiUrl =
-      'https://broombroom-user-backend-kohl.vercel.app/api';
+      'https://www.broomboomcabs.com/new-api/api';
 
   // Local backend URLs (port 5004)
   static const String _localApiUrlWeb = 'http://localhost:5004/api';
@@ -41,8 +41,8 @@ class ApiService {
 
     return {
       'Content-Type': 'application/json',
-      'X-App-Source': 'BroomBoom App',
-      'User-Agent': 'BroomBoom-App/Flutter',
+      if (!kIsWeb) 'X-App-Source': 'BroomBoom App',
+      if (!kIsWeb) 'User-Agent': 'BroomBoom-App/Flutter',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }
@@ -61,6 +61,8 @@ class ApiService {
     return Uri.parse('$_productionApiUrl$normalizedEndpoint');
   }
 
+  static const Duration _timeoutDuration = Duration(seconds: 25);
+
   static Future<http.Response> get(String endpoint) async {
     final headers = await _getHeaders();
     final primaryUri = _buildUri(endpoint);
@@ -68,7 +70,7 @@ class ApiService {
     try {
       final response = await http
           .get(primaryUri, headers: headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeoutDuration);
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
@@ -77,20 +79,25 @@ class ApiService {
     }
 
     // If primary was local or failed, automatically retry with live production
-    if (!primaryUri.toString().contains('vercel.app')) {
+    final fallbackUri = _buildProdFallbackUri(endpoint);
+    if (!primaryUri.toString().contains('vercel.app') &&
+        fallbackUri.toString() != primaryUri.toString()) {
       try {
-        final fallbackUri = _buildProdFallbackUri(endpoint);
         print('[ApiService] Retrying GET with production: $fallbackUri');
         return await http
             .get(fallbackUri, headers: headers)
-            .timeout(const Duration(seconds: 12));
+            .timeout(_timeoutDuration);
       } catch (err) {
         print('[ApiService] Production fallback GET failed: $err');
       }
     }
 
     return http.Response(
-      jsonEncode({'success': false, 'error': 'Network error'}),
+      jsonEncode({
+        'success': false,
+        'error': 'Network error',
+        'message': 'Network error: unable to reach server.',
+      }),
       503,
     );
   }
@@ -103,7 +110,7 @@ class ApiService {
     try {
       final response = await http
           .post(primaryUri, headers: headers, body: jsonBody)
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeoutDuration);
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
@@ -112,20 +119,25 @@ class ApiService {
     }
 
     // If primary was local or failed, automatically retry with live production
-    if (!primaryUri.toString().contains('vercel.app')) {
+    final fallbackUri = _buildProdFallbackUri(endpoint);
+    if (!primaryUri.toString().contains('vercel.app') &&
+        fallbackUri.toString() != primaryUri.toString()) {
       try {
-        final fallbackUri = _buildProdFallbackUri(endpoint);
         print('[ApiService] Retrying POST with production: $fallbackUri');
         return await http
             .post(fallbackUri, headers: headers, body: jsonBody)
-            .timeout(const Duration(seconds: 12));
+            .timeout(_timeoutDuration);
       } catch (err) {
         print('[ApiService] Production fallback POST failed: $err');
       }
     }
 
     return http.Response(
-      jsonEncode({'success': false, 'error': 'Network error'}),
+      jsonEncode({
+        'success': false,
+        'error': 'Network error',
+        'message': 'Network error: unable to reach server.',
+      }),
       503,
     );
   }
@@ -138,7 +150,7 @@ class ApiService {
     try {
       final response = await http
           .put(primaryUri, headers: headers, body: jsonBody)
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeoutDuration);
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
@@ -146,19 +158,24 @@ class ApiService {
       print('[ApiService] PUT $primaryUri failed: $e');
     }
 
-    if (!primaryUri.toString().contains('vercel.app')) {
+    final fallbackUri = _buildProdFallbackUri(endpoint);
+    if (!primaryUri.toString().contains('vercel.app') &&
+        fallbackUri.toString() != primaryUri.toString()) {
       try {
-        final fallbackUri = _buildProdFallbackUri(endpoint);
         return await http
             .put(fallbackUri, headers: headers, body: jsonBody)
-            .timeout(const Duration(seconds: 12));
+            .timeout(_timeoutDuration);
       } catch (err) {
         print('[ApiService] Production fallback PUT failed: $err');
       }
     }
 
     return http.Response(
-      jsonEncode({'success': false, 'error': 'Network error'}),
+      jsonEncode({
+        'success': false,
+        'error': 'Network error',
+        'message': 'Network error: unable to reach server.',
+      }),
       503,
     );
   }
@@ -170,7 +187,7 @@ class ApiService {
     try {
       final response = await http
           .delete(primaryUri, headers: headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(_timeoutDuration);
       if (response.statusCode >= 200 && response.statusCode < 500) {
         return response;
       }
@@ -178,19 +195,24 @@ class ApiService {
       print('[ApiService] DELETE $primaryUri failed: $e');
     }
 
-    if (!primaryUri.toString().contains('vercel.app')) {
+    final fallbackUri = _buildProdFallbackUri(endpoint);
+    if (!primaryUri.toString().contains('vercel.app') &&
+        fallbackUri.toString() != primaryUri.toString()) {
       try {
-        final fallbackUri = _buildProdFallbackUri(endpoint);
         return await http
             .delete(fallbackUri, headers: headers)
-            .timeout(const Duration(seconds: 12));
+            .timeout(_timeoutDuration);
       } catch (err) {
         print('[ApiService] Production fallback DELETE failed: $err');
       }
     }
 
     return http.Response(
-      jsonEncode({'success': false, 'error': 'Network error'}),
+      jsonEncode({
+        'success': false,
+        'error': 'Network error',
+        'message': 'Network error: unable to reach server.',
+      }),
       503,
     );
   }
