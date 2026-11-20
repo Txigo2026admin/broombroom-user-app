@@ -146,7 +146,7 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
     BookingService.recordSearchLead(
       pickupAddress: fromLocation,
       dropAddress: toLocation,
-      serviceType: 'Airport',
+      serviceType: isPickup ? 'airport-pickup' : 'airport-drop',
       airportDirection: isPickup ? 'Pickup from airport' : 'Drop to airport',
       airportTerminal: _selectedTerminal,
       pickupDate: startDate,

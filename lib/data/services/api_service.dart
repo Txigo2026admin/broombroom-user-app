@@ -6,8 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Live production backend URL (where admin prices are updated)
-  static const String _productionApiUrl =
-      'https://www.broomboomcabs.com/new-api/api';
+  static const String _productionApiUrl = 'http://localhost:5004/api';
 
   // Local backend URLs (port 5004)
   static const String _localApiUrlWeb = 'http://localhost:5004/api';

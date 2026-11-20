@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/booking.dart';
 import 'api_service.dart';
@@ -36,8 +37,8 @@ class BookingService {
     }
   }
 
-  /// Records any user search inquiry as an instant Booking Lead in admin with source 'BroomBoom App'
-  static Future<Booking?> recordSearchLead({
+  /// Records any user search inquiry as an instant Booking Lead via /api/booking-leads
+  static Future<Map<String, dynamic>?> recordSearchLead({
     required String pickupAddress,
     required String dropAddress,
     String? fromCity,
@@ -61,6 +62,7 @@ class BookingService {
     Map<String, dynamic>? addons,
     String? customerName,
     String? customerMobile,
+    String? customerEmail,
     String? pickupLat,
     String? pickupLng,
     String? dropLat,
@@ -68,53 +70,89 @@ class BookingService {
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedPhone = prefs.getString('phone_number') ?? prefs.getString('user_phone') ?? '';
-      final savedName = prefs.getString('user_name') ?? 'App Customer';
+      final savedPhone = prefs.getString('phone_number') ??
+          prefs.getString('user_phone') ??
+          prefs.getString('userPhone') ??
+          '';
+      final savedName = prefs.getString('user_name') ??
+          prefs.getString('userName') ??
+          '';
+      final savedEmail = prefs.getString('user_email') ??
+          prefs.getString('userEmail') ??
+          '';
 
       final phone = (customerMobile != null && customerMobile.trim().isNotEmpty)
           ? customerMobile.trim()
-          : (savedPhone.isNotEmpty ? savedPhone : '9876543210');
+          : (savedPhone.isNotEmpty ? savedPhone : null);
       final name = (customerName != null && customerName.trim().isNotEmpty)
           ? customerName.trim()
-          : savedName;
+          : (savedName.isNotEmpty ? savedName : 'App User');
+      final email = (customerEmail != null && customerEmail.trim().isNotEmpty)
+          ? customerEmail.trim()
+          : (savedEmail.isNotEmpty ? savedEmail : null);
 
-      final body = {
-        'customerName': name,
-        'customerMobile': phone,
+      final cleanFrom = fromCity ??
+          (pickupAddress.contains(',')
+              ? pickupAddress.split(',')[0].trim()
+              : pickupAddress);
+      final cleanTo = toCity ??
+          (dropAddress.contains(',')
+              ? dropAddress.split(',')[0].trim()
+              : dropAddress);
+
+      // Clean distance and duration into numeric values
+      double? distanceKm;
+      if (distance != null && distance.isNotEmpty) {
+        final numStr = distance.replaceAll(RegExp(r'[^\d.]'), '');
+        distanceKm = double.tryParse(numStr);
+      }
+
+      int? durationMinutes;
+      if (duration != null && duration.isNotEmpty) {
+        final numStr = duration.replaceAll(RegExp(r'[^\d]'), '');
+        durationMinutes = int.tryParse(numStr);
+      }
+
+      final leadBody = <String, dynamic>{
         'serviceType': serviceType,
-        'wayType': wayType ?? 'One Way',
-        'airportDirection': airportDirection,
-        'airportTerminal': airportTerminal,
-        'rentalPackage': rentalPackage,
-        'state': 'West Bengal',
+        'tripType': wayType ?? serviceType,
+        'fromCity': cleanFrom.isNotEmpty ? cleanFrom : 'Kolkata',
+        if (cleanTo.isNotEmpty) 'toCity': cleanTo,
         'pickupAddress': pickupAddress,
         'dropAddress': dropAddress,
-        'fromCity': fromCity ?? (pickupAddress.contains(',') ? pickupAddress.split(',')[0].trim() : pickupAddress),
-        'toCity': toCity ?? (dropAddress.contains(',') ? dropAddress.split(',')[0].trim() : dropAddress),
-        'distance': distance,
-        'duration': duration,
-        'pickupDate': pickupDate ?? DateTime.now().toIso8601String().split('T')[0],
+        'pickupDate':
+            pickupDate ?? DateFormat('dd-MM-yyyy').format(DateTime.now()),
         'pickupTime': pickupTime ?? '10:00 AM',
-        'returnDate': returnDate,
-        'returnTime': returnTime,
-        'vehicleCategory': vehicleCategory ?? 'Sedan',
-        'seater': seater ?? 4,
-        'fare': fare ?? 0,
-        'status': 'Pending',
-        'paymentStatus': 'PENDING',
-        'source': 'BroomBoom App',
-        'petFriendly': petFriendly,
-        'petCount': petCount,
-        'addons': addons ?? (petFriendly ? {'petAllowance': true, 'petCount': petCount} : {}),
-        'pickupLat': pickupLat,
-        'pickupLng': pickupLng,
-        'dropLat': dropLat,
-        'dropLng': dropLng,
+        if (returnDate != null) 'returnDate': returnDate,
+        if (returnTime != null) 'returnTime': returnTime,
+        if (rentalPackage != null) 'hourlyPackage': rentalPackage,
+        if (airportDirection != null) 'airportMode': airportDirection,
+        if (distanceKm != null) 'distanceKm': distanceKm,
+        if (durationMinutes != null) 'durationMinutes': durationMinutes,
+        if (fare != null) 'estimatedFare': fare,
+        'customerName': name,
+        if (phone != null && phone.isNotEmpty) 'customerMobile': phone,
+        if (email != null && email.isNotEmpty) 'customerEmail': email,
+        'source': 'BroomBoom App (Search Bar)',
+        'rawSearchParams': {
+          'vehicleCategory': vehicleCategory,
+          'seater': seater,
+          'petFriendly': petFriendly,
+          'petCount': petCount,
+          'addons': addons,
+          'pickupLat': pickupLat,
+          'pickupLng': pickupLng,
+          'dropLat': dropLat,
+          'dropLng': dropLng,
+        },
       };
 
-      final res = await ApiService.post('/bookings', body);
+      final res = await ApiService.post('/booking-leads', leadBody);
       if (res.statusCode == 200 || res.statusCode == 201) {
-        return Booking.fromJson(jsonDecode(res.body));
+        final data = jsonDecode(res.body);
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
       }
       return null;
     } catch (e) {

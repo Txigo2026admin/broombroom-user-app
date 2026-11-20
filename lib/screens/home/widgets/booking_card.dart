@@ -327,6 +327,34 @@ class _BookingCardState extends State<BookingCard> {
     );
   }
 
+  void _syncSearchLeadToBackend() {
+    if (_fromController.text.trim().isEmpty ||
+        _toController.text.trim().isEmpty) {
+      return;
+    }
+    final fromAddress = _fromFullAddress ?? _fromController.text.trim();
+    final toAddress = _toFullAddress ?? _toController.text.trim();
+
+    BookingService.recordSearchLead(
+      pickupAddress: fromAddress,
+      dropAddress: toAddress,
+      fromCity: _fromController.text.trim(),
+      toCity: _toController.text.trim(),
+      serviceType:
+          widget.isOneWay ? 'outstation-oneway' : 'outstation-roundtrip',
+      wayType: widget.isOneWay ? 'One Way' : 'Round Way',
+      pickupDate: startDate,
+      pickupTime: startTime,
+      returnDate: !widget.isOneWay ? endDate : null,
+      returnTime: !widget.isOneWay ? endTime : null,
+      pickupLat: _fromLat?.toString(),
+      pickupLng: _fromLng?.toString(),
+      dropLat: _toLat?.toString(),
+      dropLng: _toLng?.toString(),
+      customerMobile: widget.phoneNumber,
+    );
+  }
+
   void _navigateToCabs() {
     if (_fromController.text.trim().isEmpty ||
         _toController.text.trim().isEmpty) {
@@ -342,23 +370,7 @@ class _BookingCardState extends State<BookingCard> {
     final toAddress = _toFullAddress ?? _toController.text.trim();
 
     // Instant sync to Admin Booking Leads
-    BookingService.recordSearchLead(
-      pickupAddress: fromAddress,
-      dropAddress: toAddress,
-      fromCity: _fromController.text.trim(),
-      toCity: _toController.text.trim(),
-      serviceType: widget.isOneWay ? 'Outstation oneway' : 'Outstation roundtrip',
-      wayType: widget.isOneWay ? 'One Way' : 'Round Way',
-      pickupDate: startDate,
-      pickupTime: startTime,
-      returnDate: !widget.isOneWay ? endDate : null,
-      returnTime: !widget.isOneWay ? endTime : null,
-      pickupLat: _fromLat?.toString(),
-      pickupLng: _fromLng?.toString(),
-      dropLat: _toLat?.toString(),
-      dropLng: _toLng?.toString(),
-      customerMobile: widget.phoneNumber,
-    );
+    _syncSearchLeadToBackend();
 
     Navigator.push(
       context,
@@ -404,6 +416,8 @@ class _BookingCardState extends State<BookingCard> {
                     (city['display_name'] ?? city['displayName'])?.toString();
                 if (_toController.text.trim().isEmpty) {
                   _toFocusNode.requestFocus();
+                } else {
+                  _syncSearchLeadToBackend();
                 }
               },
               onChanged: (_) {
@@ -428,6 +442,8 @@ class _BookingCardState extends State<BookingCard> {
                     (city['display_name'] ?? city['displayName'])?.toString();
                 if (_fromController.text.trim().isEmpty) {
                   _fromFocusNode.requestFocus();
+                } else {
+                  _syncSearchLeadToBackend();
                 }
               },
               onChanged: (_) {

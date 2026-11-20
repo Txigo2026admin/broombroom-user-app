@@ -69,7 +69,8 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
     BookingService.recordSearchLead(
       pickupAddress: fromAddr,
       dropAddress: toAddr,
-      serviceType: 'Rental',
+      serviceType: 'local-hourly',
+      wayType: 'Local Hourly',
       rentalPackage: '${pkg['hours']} hrs / ${pkg['kms']} kms',
       pickupDate: startDate,
       pickupTime: startTime,

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'booking_review_screen.dart';
 import 'booking_support_screen.dart';
 import '../../data/services/car_service.dart';
+import '../../data/services/booking_service.dart';
 import '../../data/models/car_category.dart';
 import '../../data/services/distance_service.dart';
 import '../../theme/app_theme.dart';
@@ -90,204 +91,294 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
   Future<void> _fetchCarCategories() async {
     setState(() => _isLoading = true);
 
-    // 1. Calculate one-way road distance using exact coordinates or geocoding
-    double oneWayDist =
-        (widget.initialDistance != null && widget.initialDistance! > 0)
-            ? widget.initialDistance!
-            : 0.0;
-    if (widget.isRental) {
-      oneWayDist = (widget.includedKms ?? 50).toDouble();
-      _distance = oneWayDist;
-    } else if (oneWayDist <= 0.0) {
-      oneWayDist = await DistanceService.getDistance(
-        widget.from,
-        widget.to,
-        pickupLat: widget.fromLat,
-        pickupLng: widget.fromLng,
-        dropLat: widget.toLat,
-        dropLng: widget.toLng,
-      );
-      // For roundtrip, travel distance is 2x one-way
-      _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
-    } else {
-      _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
-    }
-
-    // 2. Fetch all categories
-    final categories = await CarService.getCarCategories();
-
-    final bool exceedsAirportLimit =
-        widget.isAirport && (oneWayDist > 25.0 || _distance > 25.0);
-    if (exceedsAirportLimit) {
-      _redirectedToOutstation = true;
-      _airportRedirectNotice =
-          'Trip distance (${(oneWayDist > 0 ? oneWayDist : _distance).toStringAsFixed(1)} km) exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
-    }
-
-    // 3. Fetch prices for each category
-    final String rideType =
-        widget.isRental
-            ? 'Rental'
-            : ((widget.isAirport && !_redirectedToOutstation)
-                ? 'Airport'
-                : (widget.isOneWay ? 'Oneway' : 'Roundtrip'));
-
+    List<CarCategory> categories = [];
     Map<String, double> prices = {};
-    for (var cat in categories) {
-      final result = await CarService.calculatePrice(
-        rideType: rideType,
-        sourceCity: widget.from,
-        destinationCity: widget.to,
-        category: cat.name,
-        distance: _distance,
-        oneWayDistance: oneWayDist,
-        pickupLat: widget.fromLat,
-        pickupLng: widget.fromLng,
-        dropLat: widget.toLat,
-        dropLng: widget.toLng,
-        days: 1,
+
+    try {
+      // 1. Calculate one-way road distance using exact coordinates or geocoding
+      double oneWayDist =
+          (widget.initialDistance != null && widget.initialDistance! > 0)
+              ? widget.initialDistance!
+              : 0.0;
+      if (widget.isRental) {
+        oneWayDist = (widget.includedKms ?? 50).toDouble();
+        _distance = oneWayDist;
+      } else if (oneWayDist <= 0.0) {
+        try {
+          oneWayDist = await DistanceService.getDistance(
+            widget.from,
+            widget.to,
+            pickupLat: widget.fromLat,
+            pickupLng: widget.fromLng,
+            dropLat: widget.toLat,
+            dropLng: widget.toLng,
+          ).timeout(const Duration(seconds: 4), onTimeout: () => 150.0);
+        } catch (_) {
+          oneWayDist = 150.0;
+        }
+        // For roundtrip, travel distance is 2x one-way
+        _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
+      } else {
+        _distance = widget.isOneWay ? oneWayDist : (oneWayDist * 2);
+      }
+
+      // 2. Fetch all categories
+      try {
+        categories = await CarService.getCarCategories()
+            .timeout(const Duration(seconds: 4));
+      } catch (e) {
+        debugPrint('Error fetching categories: $e');
+        categories = await CarService.getCarCategories();
+      }
+
+      final bool exceedsAirportLimit =
+          widget.isAirport && (oneWayDist > 25.0 || _distance > 25.0);
+      if (exceedsAirportLimit) {
+        _redirectedToOutstation = true;
+        _airportRedirectNotice =
+            'Trip distance (${(oneWayDist > 0 ? oneWayDist : _distance).toStringAsFixed(1)} km) exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
+      }
+
+      // 3. Fetch prices for each category in parallel
+      final String rideType =
+          widget.isRental
+              ? 'Rental'
+              : ((widget.isAirport && !_redirectedToOutstation)
+                  ? 'Airport'
+                  : (widget.isOneWay ? 'Oneway' : 'Roundtrip'));
+
+      await Future.wait(
+        categories.map((cat) async {
+          try {
+            final result = await CarService.calculatePrice(
+              rideType: rideType,
+              sourceCity: widget.from,
+              destinationCity: widget.to,
+              category: cat.name,
+              distance: _distance,
+              oneWayDistance: oneWayDist,
+              pickupLat: widget.fromLat,
+              pickupLng: widget.fromLng,
+              dropLat: widget.toLat,
+              dropLng: widget.toLng,
+              days: 1,
+              pickupDate: widget.date,
+              pickupTime: widget.time,
+              returnDate: widget.returnDate,
+              returnTime: widget.returnTime,
+              airportName: _redirectedToOutstation ? null : widget.airportName,
+              packageHours: widget.packageHours,
+              includedKms: widget.includedKms,
+              petType: widget.petType,
+              carryingPet: widget.petType != null,
+              addons:
+                  widget.petType != null
+                      ? {'petAllowance': true, 'petCount': 1}
+                      : null,
+            ).timeout(const Duration(seconds: 4));
+
+            if (result['success'] == true &&
+                result['fare'] != null &&
+                (result['fare'] as num) > 0) {
+              prices[cat.name] = (result['fare'] as num).toDouble();
+              _originalPrices[cat.name] =
+                  (result['originalFare'] as num?)?.toDouble() ??
+                  (prices[cat.name]! * 1.12);
+              if (result['redirectedToOutstation'] == true || exceedsAirportLimit) {
+                _redirectedToOutstation = true;
+                _airportRedirectNotice =
+                    result['airportNotice']?.toString() ??
+                    'Trip distance exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
+              }
+              if (_distance <= 0 &&
+                  result['distance'] != null &&
+                  (result['distance'] as num) > 0) {
+                final resDist = (result['distance'] as num).toDouble();
+                _distance = widget.isOneWay ? resDist : (resDist * 2);
+              }
+
+              final details =
+                  result['details'] is Map<String, dynamic>
+                      ? (result['details'] as Map<String, dynamic>)
+                      : (result['details'] is Map
+                          ? Map<String, dynamic>.from(result['details'] as Map)
+                          : null);
+              if (details != null) {
+                _pricingDetails[cat.name] = details;
+              }
+
+              if (widget.isRental && (widget.includedKms ?? 0) > 0) {
+                _includedKms[cat.name] = (widget.includedKms!).toDouble();
+              } else if (widget.isAirport &&
+                  details != null &&
+                  details['baseKms'] != null) {
+                _includedKms[cat.name] = (details['baseKms'] as num).toDouble();
+              } else if (details != null &&
+                  details['billableKms'] != null &&
+                  (details['billableKms'] as num) > 0) {
+                _includedKms[cat.name] = (details['billableKms'] as num).toDouble();
+              } else if (result['distance'] != null &&
+                  (result['distance'] as num) > 0) {
+                _includedKms[cat.name] = (result['distance'] as num).toDouble();
+              } else if (_distance > 0) {
+                _includedKms[cat.name] = _distance;
+              } else {
+                _includedKms[cat.name] = widget.isOneWay ? 150.0 : 300.0;
+              }
+
+              double rate = 0.0;
+              if (widget.isAirport &&
+                  details != null &&
+                  details['extraKmRate'] != null) {
+                rate = (details['extraKmRate'] as num).toDouble();
+              } else if (details != null &&
+                  details['extraKmRate'] != null &&
+                  (details['extraKmRate'] as num) > 0) {
+                rate = (details['extraKmRate'] as num).toDouble();
+              } else if (details != null &&
+                  details['ratePerKm'] != null &&
+                  (details['ratePerKm'] as num) > 0) {
+                rate = (details['ratePerKm'] as num).toDouble();
+              } else if (details != null &&
+                  details['perKm'] != null &&
+                  (details['perKm'] as num) > 0) {
+                rate = (details['perKm'] as num).toDouble();
+              }
+              _perKmRates[cat.name] =
+                  rate > 0 ? rate : _getDefaultPerKmRate(cat.name, cat.perKmRate);
+            } else {
+              final fallbackRate = _getDefaultPerKmRate(cat.name, cat.perKmRate);
+              final effectiveDist =
+                  _distance > 0 ? _distance : (widget.isOneWay ? 150.0 : 300.0);
+              double calculated =
+                  (cat.baseFare +
+                      (effectiveDist * fallbackRate) +
+                      (cat.seater > 4 ? 300 : 250));
+              if (widget.petType != null) {
+                calculated += 1000.0;
+              }
+              prices[cat.name] =
+                  calculated > 0
+                      ? calculated
+                      : (cat.baseFare > 0 ? cat.baseFare : 2500.0);
+              _perKmRates[cat.name] = fallbackRate;
+              _includedKms[cat.name] = effectiveDist;
+            }
+          } catch (_) {
+            final fallbackRate = _getDefaultPerKmRate(cat.name, cat.perKmRate);
+            final effectiveDist =
+                _distance > 0 ? _distance : (widget.isOneWay ? 150.0 : 300.0);
+            double calculated =
+                (cat.baseFare +
+                    (effectiveDist * fallbackRate) +
+                    (cat.seater > 4 ? 300 : 250));
+            if (widget.petType != null) {
+              calculated += 1000.0;
+            }
+            prices[cat.name] =
+                calculated > 0
+                    ? calculated
+                    : (cat.baseFare > 0 ? cat.baseFare : 2500.0);
+            _perKmRates[cat.name] = fallbackRate;
+            _includedKms[cat.name] = effectiveDist;
+          }
+        }),
+      );
+
+      // Sort categories safely
+      final List<String> priorityOrder = [
+        'sedan',
+        'dzire',
+        'etios',
+        'ertiga',
+        'suv',
+        'crysta',
+        'suv+',
+        'luxury',
+        '13',
+        '17',
+        '24',
+        '25',
+        'urbania',
+        'traveller',
+        'tempo',
+      ];
+      categories.sort((a, b) {
+        String nameA = ((a.displayName) + (a.name)).toLowerCase();
+        String nameB = ((b.displayName) + (b.name)).toLowerCase();
+        int indexA = priorityOrder.indexWhere(
+          (element) => nameA.contains(element),
+        );
+        int indexB = priorityOrder.indexWhere(
+          (element) => nameB.contains(element),
+        );
+        if (indexA == -1) indexA = 99;
+        if (indexB == -1) indexB = 99;
+        return indexA.compareTo(indexB);
+      });
+    } catch (e) {
+      debugPrint('Error in _fetchCarCategories: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _carCategories = categories;
+          _calculatedPrices = prices;
+          _isLoading = false;
+        });
+        _syncLeadToBackend();
+      }
+    }
+  }
+
+  void _syncLeadToBackend() {
+    try {
+      final safeIndex = _selectedCarIndex.clamp(0, _carCategories.length - 1);
+      final car = _carCategories.isNotEmpty ? _carCategories[safeIndex] : null;
+      final fare =
+          car != null
+              ? (_calculatedPrices[car.name] ?? car.baseFare)
+              : null;
+
+      final rentalPkg =
+          widget.isRental && widget.packageHours != null
+              ? '${widget.packageHours} hrs / ${widget.includedKms ?? 0} kms'
+              : null;
+
+      BookingService.recordSearchLead(
+        pickupAddress: widget.from,
+        dropAddress: widget.to,
+        fromCity: widget.from,
+        toCity: widget.to,
+        serviceType:
+            widget.isAirport
+                ? (widget.airportDirection?.toLowerCase().contains('pickup') ==
+                        true
+                    ? 'airport-pickup'
+                    : 'airport-drop')
+                : (widget.isRental
+                    ? 'local-hourly'
+                    : (widget.isOneWay
+                        ? 'outstation-oneway'
+                        : 'outstation-roundtrip')),
+        wayType: widget.isOneWay ? 'One Way' : 'Round Way',
+        airportDirection: widget.airportDirection,
+        airportTerminal: widget.airportTerminal,
+        rentalPackage: rentalPkg,
+        distance: '${_distance.toStringAsFixed(1)} km',
+        fare: fare,
+        vehicleCategory: car?.displayName,
+        seater: car?.seater,
+        customerMobile: widget.phoneNumber,
         pickupDate: widget.date,
         pickupTime: widget.time,
         returnDate: widget.returnDate,
         returnTime: widget.returnTime,
-        airportName: _redirectedToOutstation ? null : widget.airportName,
-        packageHours: widget.packageHours,
-        includedKms: widget.includedKms,
-        petType: widget.petType,
-        carryingPet: widget.petType != null,
-        addons:
-            widget.petType != null
-                ? {'petAllowance': true, 'petCount': 1}
-                : null,
+        pickupLat: widget.fromLat?.toString(),
+        pickupLng: widget.fromLng?.toString(),
+        dropLat: widget.toLat?.toString(),
+        dropLng: widget.toLng?.toString(),
       );
-      if (result['success'] == true &&
-          result['fare'] != null &&
-          (result['fare'] as num) > 0) {
-        prices[cat.name] = (result['fare'] as num).toDouble();
-        _originalPrices[cat.name] =
-            (result['originalFare'] as num?)?.toDouble() ??
-            (prices[cat.name]! * 1.12);
-        if (result['redirectedToOutstation'] == true || exceedsAirportLimit) {
-          _redirectedToOutstation = true;
-          _airportRedirectNotice =
-              result['airportNotice']?.toString() ??
-              'Trip distance exceeds 25 km airport limit. Automatically switched to Outstation cab pricing.';
-        }
-        if (_distance <= 0 &&
-            result['distance'] != null &&
-            (result['distance'] as num) > 0) {
-          final resDist = (result['distance'] as num).toDouble();
-          _distance = widget.isOneWay ? resDist : (resDist * 2);
-        }
-
-        final details =
-            result['details'] is Map<String, dynamic>
-                ? (result['details'] as Map<String, dynamic>)
-                : (result['details'] is Map
-                    ? Map<String, dynamic>.from(result['details'] as Map)
-                    : null);
-        if (details != null) {
-          _pricingDetails[cat.name] = details;
-        }
-
-        if (widget.isRental && (widget.includedKms ?? 0) > 0) {
-          _includedKms[cat.name] = (widget.includedKms!).toDouble();
-        } else if (widget.isAirport &&
-            details != null &&
-            details['baseKms'] != null) {
-          _includedKms[cat.name] = (details['baseKms'] as num).toDouble();
-        } else if (details != null &&
-            details['billableKms'] != null &&
-            (details['billableKms'] as num) > 0) {
-          _includedKms[cat.name] = (details['billableKms'] as num).toDouble();
-        } else if (result['distance'] != null &&
-            (result['distance'] as num) > 0) {
-          _includedKms[cat.name] = (result['distance'] as num).toDouble();
-        } else if (_distance > 0) {
-          _includedKms[cat.name] = _distance;
-        } else {
-          _includedKms[cat.name] = widget.isOneWay ? 150.0 : 300.0;
-        }
-
-        double rate = 0.0;
-        if (widget.isAirport &&
-            details != null &&
-            details['extraKmRate'] != null) {
-          rate = (details['extraKmRate'] as num).toDouble();
-        } else if (details != null &&
-            details['extraKmRate'] != null &&
-            (details['extraKmRate'] as num) > 0) {
-          rate = (details['extraKmRate'] as num).toDouble();
-        } else if (details != null &&
-            details['ratePerKm'] != null &&
-            (details['ratePerKm'] as num) > 0) {
-          rate = (details['ratePerKm'] as num).toDouble();
-        } else if (details != null &&
-            details['perKm'] != null &&
-            (details['perKm'] as num) > 0) {
-          rate = (details['perKm'] as num).toDouble();
-        }
-        _perKmRates[cat.name] =
-            rate > 0 ? rate : _getDefaultPerKmRate(cat.name, cat.perKmRate);
-      } else {
-        final fallbackRate = _getDefaultPerKmRate(cat.name, cat.perKmRate);
-        final effectiveDist =
-            _distance > 0 ? _distance : (widget.isOneWay ? 150.0 : 300.0);
-        double calculated =
-            (cat.baseFare +
-                (effectiveDist * fallbackRate) +
-                (cat.seater > 4 ? 300 : 250));
-        if (widget.petType != null) {
-          calculated += 1000.0;
-        }
-        prices[cat.name] =
-            calculated > 0
-                ? calculated
-                : (cat.baseFare > 0 ? cat.baseFare : 2500.0);
-        _perKmRates[cat.name] = fallbackRate;
-        _includedKms[cat.name] = effectiveDist;
-      }
-    }
-
-    // Sort categories safely
-    final List<String> priorityOrder = [
-      'sedan',
-      'dzire',
-      'etios',
-      'ertiga',
-      'suv',
-      'crysta',
-      'suv+',
-      'luxury',
-      '13',
-      '17',
-      '24',
-      '25',
-      'urbania',
-      'traveller',
-      'tempo',
-    ];
-    categories.sort((a, b) {
-      String nameA = ((a.displayName) + (a.name)).toLowerCase();
-      String nameB = ((b.displayName) + (b.name)).toLowerCase();
-      int indexA = priorityOrder.indexWhere(
-        (element) => nameA.contains(element),
-      );
-      int indexB = priorityOrder.indexWhere(
-        (element) => nameB.contains(element),
-      );
-      if (indexA == -1) indexA = 99;
-      if (indexB == -1) indexB = 99;
-      return indexA.compareTo(indexB);
-    });
-
-    if (mounted) {
-      setState(() {
-        _carCategories = categories;
-        _calculatedPrices = prices;
-        _isLoading = false;
-      });
-    }
+    } catch (_) {}
   }
 
   @override
@@ -1570,6 +1661,10 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
             Icons.route_rounded,
             'Total kms: $kmVal kms included',
           ),
+          _buildTabDetailItem(
+            Icons.speed_rounded,
+            'Extra rate: ₹$rateVal/km',
+          ),
           if (!widget.isOneWay) ...[
             _buildTabDetailItem(
               Icons.speed_rounded,
@@ -1683,9 +1778,10 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Container(
-                  constraints: const BoxConstraints(maxWidth: 230),
+                  constraints:
+                      const BoxConstraints(maxWidth: 240, maxHeight: 130),
                   child: Image.asset(
                     'assets/images/loading_cab.gif',
                     fit: BoxFit.contain,
@@ -1703,7 +1799,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
                     },
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(
                   'Looking for the best rates',
                   style: GoogleFonts.outfit(
