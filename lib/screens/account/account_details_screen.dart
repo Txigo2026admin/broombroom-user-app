@@ -18,7 +18,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen> {
   String _userName = 'Loading...';
   String _email = 'Loading...';
   String _supportEmail = 'support@broomboomcabs.com';
-  String _supportPhone = '+91 84484 45566';
+  String _supportPhone = '+91 8240765499';
 
   @override
   void initState() {

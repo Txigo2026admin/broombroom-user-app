@@ -481,6 +481,14 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
         setState(() {
           _isCreatingBooking = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              orderRes.message ?? 'Cashfree gateway is initializing. You can tap Pay Now below.',
+            ),
+            backgroundColor: const Color(0xFFE65100),
+          ),
+        );
         // Failed to create payment order -> route to Payment Pending Screen so user can click PAY NOW
         Navigator.pushReplacement(
           context,

@@ -26,7 +26,8 @@ class _LocalBookingCardState extends State<LocalBookingCard> {
 
   static DateTime _getInitialStartTime() {
     final now = DateTime.now();
-    final minTime = now.add(const Duration(minutes: 15));
+    // Rental (Local Hourly): 30 minutes after current time
+    final minTime = now.add(const Duration(minutes: 30));
     int remainder = minTime.minute % 15;
     int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
     final rounded = minTime.add(Duration(minutes: minutesToAdd));

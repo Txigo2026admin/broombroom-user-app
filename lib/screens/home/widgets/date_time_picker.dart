@@ -34,6 +34,13 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
   late int selectedMinuteIndex;
   late int selectedPeriodIndex;
 
+  String _getMinimumTimeLabel() {
+    final diffMins = effectiveMinDateTime.difference(DateTime.now()).inMinutes;
+    if (diffMins >= 45) return '1 hour';
+    if (diffMins >= 20) return '30 min';
+    return '15 min';
+  }
+
   static DateTime calculateDefaultMinTime() {
     final now = DateTime.now();
     final minTime = now.add(const Duration(minutes: 15));
@@ -407,7 +414,7 @@ class _DateTimePickerDialogState extends State<DateTimePickerDialog> {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            'Must be at least 15 min after current time (Min: ${DateFormat('hh:mm a').format(effectiveMinDateTime)})',
+                            'Must be at least ${_getMinimumTimeLabel()} after current time (Min: ${DateFormat('hh:mm a').format(effectiveMinDateTime)})',
                             style: GoogleFonts.outfit(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,

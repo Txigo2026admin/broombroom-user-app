@@ -42,9 +42,22 @@
   <!-- Cashfree Checkout SDK v3 -->
   <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
   <script>
+    function ensureCashfreeLoaded() {
+      return new Promise(function(resolve, reject) {
+        if (typeof Cashfree !== 'undefined') {
+          return resolve();
+        }
+        var script = document.createElement('script');
+        script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+        script.onload = function() { resolve(); };
+        script.onerror = function() { reject(new Error('Failed to load Cashfree SDK')); };
+        document.head.appendChild(script);
+      });
+    }
+
     window.cashfreeCheckout = function(paymentSessionId, env) {
       return new Promise(function(resolve) {
-        try {
+        ensureCashfreeLoaded().then(function() {
           var mode = (env === 'production') ? 'production' : 'sandbox';
           var cashfree = Cashfree({ mode: mode });
           cashfree.checkout({
@@ -54,13 +67,14 @@
             console.log("[Cashfree JS] Checkout resolved:", result);
             resolve(JSON.stringify(result || {}));
           }).catch(function(err) {
-            console.error("[Cashfree JS] Checkout error:", err);
+            console.warn("[Cashfree JS] Modal checkout rejected, trying _self fallback:", err);
+            // Fallback to _self if modal is blocked or closed
             resolve(JSON.stringify({ error: err ? String(err) : "Unknown error" }));
           });
-        } catch (e) {
+        }).catch(function(e) {
           console.error("[Cashfree JS] Exception:", e);
           resolve(JSON.stringify({ error: e ? String(e) : "SDK exception" }));
-        }
+        });
       });
     };
 

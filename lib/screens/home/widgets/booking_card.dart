@@ -19,6 +19,8 @@ class BookingCard extends StatefulWidget {
   final double? initialToLng;
   final String? initialStartDate;
   final String? initialStartTime;
+  final String? initialEndDate;
+  final String? initialEndTime;
 
   const BookingCard({
     super.key,
@@ -33,6 +35,8 @@ class BookingCard extends StatefulWidget {
     this.initialToLng,
     this.initialStartDate,
     this.initialStartTime,
+    this.initialEndDate,
+    this.initialEndTime,
   });
 
   @override
@@ -107,11 +111,20 @@ class _BookingCardState extends State<BookingCard> {
         widget.initialStartTime != oldWidget.initialStartTime) {
       startTime = widget.initialStartTime!;
     }
+    if (widget.initialEndDate != null &&
+        widget.initialEndDate != oldWidget.initialEndDate) {
+      endDate = widget.initialEndDate!;
+    }
+    if (widget.initialEndTime != null &&
+        widget.initialEndTime != oldWidget.initialEndTime) {
+      endTime = widget.initialEndTime!;
+    }
   }
 
   static DateTime _getInitialStartTime() {
     final now = DateTime.now();
-    final minTime = now.add(const Duration(minutes: 15));
+    // Outstation One-way and Round-trip: 1 hour after current time
+    final minTime = now.add(const Duration(hours: 1));
     int remainder = minTime.minute % 15;
     int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
     final rounded = minTime.add(Duration(minutes: minutesToAdd));

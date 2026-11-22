@@ -41,6 +41,7 @@ class _AirportBookingCardState extends State<AirportBookingCard> {
 
   static DateTime _getInitialStartTime() {
     final now = DateTime.now();
+    // Airport: 15 minutes after current time
     final minTime = now.add(const Duration(minutes: 15));
     int remainder = minTime.minute % 15;
     int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);

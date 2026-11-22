@@ -25,6 +25,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
   late int _selectedNavIndex;
   bool _isOneWay = true;
   String? _prefilledFrom;
@@ -35,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double? _prefilledToLng;
   String? _prefilledStartDate;
   String? _prefilledStartTime;
+  String? _prefilledEndDate;
+  String? _prefilledEndTime;
 
   @override
   void initState() {
@@ -47,6 +50,45 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowReviewPopup();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onPackageSelected({
+    required String fromCity,
+    required String toCity,
+    required String startDate,
+    required String startTime,
+    String? endDate,
+    String? endTime,
+    double? fromLat,
+    double? fromLng,
+  }) {
+    setState(() {
+      _selectedNavIndex = 1; // Round Trip Outstation
+      _isOneWay = false;
+      _prefilledFrom = fromCity.isNotEmpty ? fromCity : _prefilledFrom;
+      _prefilledTo = toCity;
+      _prefilledFromLat = fromLat ?? _prefilledFromLat;
+      _prefilledFromLng = fromLng ?? _prefilledFromLng;
+      _prefilledStartDate = startDate;
+      _prefilledStartTime = startTime;
+      _prefilledEndDate = endDate;
+      _prefilledEndTime = endTime;
+    });
+
+    // Smoothly scroll to the Search Bar at top of the page
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _checkAndShowReviewPopup() {
@@ -98,6 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _buildAppBar(context),
       ),
       body: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.only(bottom: 24),
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -106,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             PetCabBanner(phoneNumber: widget.phoneNumber),
             const SizedBox(height: 8),
-            const BannersSection(),
+            BannersSection(onPackageSelected: _onPackageSelected),
             const SizedBox(height: 8),
             const ExpertSection(),
           ],
@@ -306,6 +349,8 @@ class _HomeScreenState extends State<HomeScreen> {
           initialToLng: _prefilledToLng,
           initialStartDate: _prefilledStartDate,
           initialStartTime: _prefilledStartTime,
+          initialEndDate: _prefilledEndDate,
+          initialEndTime: _prefilledEndTime,
         );
     }
   }

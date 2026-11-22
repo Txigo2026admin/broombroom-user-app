@@ -88,38 +88,42 @@ class PaymentService {
     String? returnUrl,
   }) async {
     try {
-      // Always use the production HTTPS payment return URL.
-      final effectiveReturnUrl =
-          returnUrl ?? 'https://www.broomboomcabs.com/payment/success';
+      String? effectiveReturnUrl = returnUrl;
+      if (effectiveReturnUrl == null || effectiveReturnUrl.isEmpty) {
+        if (kIsWeb) {
+          try {
+            final origin = Uri.base.origin;
+            effectiveReturnUrl = '$origin/?booking_id=$bookingId';
+          } catch (_) {
+            effectiveReturnUrl = null;
+          }
+        }
+      }
 
-      final uri = Uri.tryParse(effectiveReturnUrl);
-
-      if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-        return PaymentOrderResult(
-          success: false,
-          message: 'Invalid payment return URL. HTTPS is required.',
-        );
+      final Map<String, dynamic> payload = {
+        'bookingId': bookingId,
+      };
+      if (effectiveReturnUrl != null && effectiveReturnUrl.isNotEmpty) {
+        payload['returnUrl'] = effectiveReturnUrl;
       }
 
       if (kDebugMode) {
-        debugPrint('Creating payment order: $bookingId');
-        debugPrint('Payment return URL: $effectiveReturnUrl');
+        debugPrint('[PaymentService] Creating payment order for: $bookingId');
+        if (effectiveReturnUrl != null) {
+          debugPrint('[PaymentService] Return URL: $effectiveReturnUrl');
+        }
       }
 
-      final response = await ApiService.post('/payment/create-order', {
-        'bookingId': bookingId,
-        'returnUrl': effectiveReturnUrl,
-      });
+      final response = await ApiService.post('/payment/create-order', payload);
 
       final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && data['success'] == true) {
         return PaymentOrderResult.fromJson(data);
       }
 
       if (kDebugMode) {
-        debugPrint('Payment API status: ${response.statusCode}');
-        debugPrint('Payment API response: ${response.body}');
+        debugPrint('[PaymentService] API error ${response.statusCode}: ${response.body}');
       }
 
       return PaymentOrderResult(
@@ -127,11 +131,11 @@ class PaymentService {
         message:
             data['message'] ??
             data['error'] ??
-            'Failed to create payment order',
+            'Failed to create payment order (HTTP ${response.statusCode})',
       );
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error in createPaymentOrder: $e');
+        debugPrint('[PaymentService] Error in createPaymentOrder: $e');
       }
 
       return PaymentOrderResult(

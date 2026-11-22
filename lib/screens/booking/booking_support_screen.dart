@@ -34,7 +34,7 @@ class BookingSupportScreen extends StatefulWidget {
 
 class _BookingSupportScreenState extends State<BookingSupportScreen> {
   String _supportEmail = 'support@broomboomcabs.com';
-  String _supportPhone = '+91 84484 45566';
+  String _supportPhone = '+91 8240765499';
   String _searchQuery = '';
   int _selectedCategoryIndex = 0;
 
@@ -138,7 +138,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -158,14 +162,17 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredFaqs = _faqs.where((faq) {
-      final matchesCategory = _selectedCategoryIndex == 0 ||
-          faq.category == _categories[_selectedCategoryIndex];
-      final matchesSearch = _searchQuery.isEmpty ||
-          faq.question.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          faq.answer.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    }).toList();
+    final filteredFaqs =
+        _faqs.where((faq) {
+          final matchesCategory =
+              _selectedCategoryIndex == 0 ||
+              faq.category == _categories[_selectedCategoryIndex];
+          final matchesSearch =
+              _searchQuery.isEmpty ||
+              faq.question.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              faq.answer.toLowerCase().contains(_searchQuery.toLowerCase());
+          return matchesCategory && matchesSearch;
+        }).toList();
 
     return Scaffold(
       backgroundColor: kBgMid,
@@ -225,7 +232,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
             // FAQs Section Header
             Row(
               children: [
-                const Icon(Icons.help_outline_rounded, color: kAmberDeep, size: 20),
+                const Icon(
+                  Icons.help_outline_rounded,
+                  color: kAmberDeep,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Frequently Asked Questions',
@@ -262,23 +273,30 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
 
   // ── Specific Booking Context Card ──────────────────────────────────────────
   Widget _buildBookingContextCard() {
-    final bId = widget.bookingId ??
+    final bId =
+        widget.bookingId ??
         widget.booking?.bookingId ??
         (widget.booking?.id != null && widget.booking!.id!.length >= 8
             ? widget.booking!.id!.substring(0, 8).toUpperCase()
             : 'BB-BOOKING');
-    final pickup = widget.pickupAddress ?? widget.booking?.pickupAddress ?? 'Pickup Location';
-    final drop = widget.dropAddress ?? widget.booking?.dropAddress ?? 'Drop Location';
+    final pickup =
+        widget.pickupAddress ??
+        widget.booking?.pickupAddress ??
+        'Pickup Location';
+    final drop =
+        widget.dropAddress ?? widget.booking?.dropAddress ?? 'Drop Location';
     final statusText = widget.status ?? widget.booking?.status ?? 'Confirmed';
-    final service = widget.vehicleCategory ??
+    final service =
+        widget.vehicleCategory ??
         (widget.booking != null
             ? '${widget.booking!.serviceType} • ${widget.booking!.vehicleCategory}'
             : 'Cab Booking');
-    final dateTime = widget.date != null
-        ? '${widget.date}${widget.time != null ? " • ${widget.time}" : ""}'
-        : (widget.booking != null
-            ? '${widget.booking!.pickupDate} • ${widget.booking!.pickupTime}'
-            : '');
+    final dateTime =
+        widget.date != null
+            ? '${widget.date}${widget.time != null ? " • ${widget.time}" : ""}'
+            : (widget.booking != null
+                ? '${widget.booking!.pickupDate} • ${widget.booking!.pickupTime}'
+                : '');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -335,7 +353,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.trip_origin_rounded, size: 14, color: kAmberDeep),
+              const Icon(
+                Icons.trip_origin_rounded,
+                size: 14,
+                color: kAmberDeep,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -354,7 +376,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.location_on_rounded, size: 14, color: Colors.redAccent),
+              const Icon(
+                Icons.location_on_rounded,
+                size: 14,
+                color: Colors.redAccent,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -400,10 +426,7 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            const Color(0xFFFFF9E6),
-            kAmberSoft.withValues(alpha: 0.8),
-          ],
+          colors: [const Color(0xFFFFF9E6), kAmberSoft.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -431,11 +454,12 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
               child: Image.asset(
                 'assets/images/logo.png',
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.support_agent_rounded,
-                  color: kAmberDeep,
-                  size: 28,
-                ),
+                errorBuilder:
+                    (context, error, stackTrace) => const Icon(
+                      Icons.support_agent_rounded,
+                      color: kAmberDeep,
+                      size: 28,
+                    ),
               ),
             ),
           ),
@@ -455,7 +479,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
                 const SizedBox(height: 2),
                 Text(
                   'Browse FAQs below or reach our 24x7 team directly via phone or email.',
-                  style: GoogleFonts.outfit(fontSize: 12, color: kInkSoft, height: 1.3),
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: kInkSoft,
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),
@@ -485,16 +513,31 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
         style: GoogleFonts.outfit(fontSize: 14, color: kInk),
         decoration: InputDecoration(
           hintText: 'Search queries (e.g. refund, driver, delay)...',
-          hintStyle: GoogleFonts.outfit(color: kInkSoft.withValues(alpha: 0.7), fontSize: 13),
-          prefixIcon: const Icon(Icons.search_rounded, color: kAmberDeep, size: 20),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear_rounded, size: 18, color: kInkSoft),
-                  onPressed: () => setState(() => _searchQuery = ''),
-                )
-              : null,
+          hintStyle: GoogleFonts.outfit(
+            color: kInkSoft.withValues(alpha: 0.7),
+            fontSize: 13,
+          ),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: kAmberDeep,
+            size: 20,
+          ),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(
+                      Icons.clear_rounded,
+                      size: 18,
+                      color: kInkSoft,
+                    ),
+                    onPressed: () => setState(() => _searchQuery = ''),
+                  )
+                  : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -606,7 +649,11 @@ class _BookingSupportScreenState extends State<BookingSupportScreen> {
       alignment: Alignment.center,
       child: Column(
         children: [
-          Icon(Icons.search_off_rounded, size: 44, color: kInkSoft.withValues(alpha: 0.5)),
+          Icon(
+            Icons.search_off_rounded,
+            size: 44,
+            color: kInkSoft.withValues(alpha: 0.5),
+          ),
           const SizedBox(height: 8),
           Text(
             'No matching questions found',

@@ -4,7 +4,18 @@ import 'package_booking_dialog.dart';
 import '../../../theme/app_theme.dart';
 
 class BannersSection extends StatelessWidget {
-  const BannersSection({super.key});
+  final void Function({
+    required String fromCity,
+    required String toCity,
+    required String startDate,
+    required String startTime,
+    String? endDate,
+    String? endTime,
+    double? fromLat,
+    double? fromLng,
+  })? onPackageSelected;
+
+  const BannersSection({super.key, this.onPackageSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +45,11 @@ class BannersSection extends StatelessWidget {
       onTap: () {
         showDialog(
           context: context,
-          builder: (context) => PackageBookingDialog(packageName: title),
+          builder:
+              (context) => PackageBookingDialog(
+                packageName: title,
+                onExplore: onPackageSelected,
+              ),
         );
       },
       child: Container(
