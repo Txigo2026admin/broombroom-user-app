@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../theme/app_theme.dart';
+import '../../../utils/url_launcher_helper.dart';
 
 class ExpertSection extends StatelessWidget {
   const ExpertSection({super.key});
@@ -38,12 +39,18 @@ class ExpertSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'YOUR TRAVEL EXPERT',
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: kInk,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'YOUR TRAVEL EXPERT',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: kInk,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -71,7 +78,16 @@ class ExpertSection extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {},
+                onTap: () async {
+                  final launched = await UrlLauncherHelper.openUrl('tel:8240765499');
+                  if (!launched && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Call our 24x7 Travel Expert: 8240765499'),
+                      ),
+                    );
+                  }
+                },
                 borderRadius: BorderRadius.circular(20),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(

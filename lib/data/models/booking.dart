@@ -208,10 +208,22 @@ class TimelineItem {
   });
 
   factory TimelineItem.fromJson(Map<String, dynamic> json) {
+    DateTime parsedDate;
+    try {
+      final ts = json['timestamp'] ?? json['time'] ?? json['date'];
+      if (ts != null) {
+        parsedDate = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+      } else {
+        parsedDate = DateTime.now();
+      }
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
     return TimelineItem(
-      status: json['status'] ?? '',
-      message: json['message'] ?? '',
-      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
+      status: json['status']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+      timestamp: parsedDate,
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../data/services/booking_service.dart';
 import '../../data/models/car_category.dart';
 import '../../data/services/distance_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/booking_steps_bar.dart';
 
 class CabSelectionScreen extends StatefulWidget {
   final String from;
@@ -423,6 +424,7 @@ class _CabSelectionScreenState extends State<CabSelectionScreen>
       ),
       body: Column(
         children: [
+          const BookingStepsBar(currentStep: 2),
           // Trip Info Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

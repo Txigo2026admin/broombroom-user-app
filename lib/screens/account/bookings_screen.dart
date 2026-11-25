@@ -32,17 +32,34 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   List<Booking> get _filteredBookings {
-    if (_selectedTab == 0) {
-      return _allBookings
-          .where((b) => b.status == 'Confirmed' || b.status == 'Pending')
-          .toList();
-    } else if (_selectedTab == 1) {
-      return _allBookings.where((b) => b.status == 'Confirmed').toList();
-    } else {
-      return _allBookings
-          .where((b) => b.status == 'Completed' || b.status == 'Cancelled')
-          .toList();
-    }
+    return _allBookings.where((b) {
+      final s = (b.status ?? '').trim().toLowerCase();
+      if (_selectedTab == 0) {
+        // Upcoming: pending, confirmed, assigned, scheduled, etc.
+        return s == 'pending' ||
+            s == 'confirmed' ||
+            s == 'assigned' ||
+            s == 'scheduled' ||
+            s == 'upcoming' ||
+            (s != 'completed' && s != 'cancelled' && s != 'canceled' && s != 'ongoing');
+      } else if (_selectedTab == 1) {
+        // Current: ongoing, in-progress, active, arrived, started, or confirmed
+        return s == 'ongoing' ||
+            s == 'in-progress' ||
+            s == 'inprogress' ||
+            s == 'started' ||
+            s == 'active' ||
+            s == 'arrived' ||
+            s == 'confirmed';
+      } else {
+        // History: completed, cancelled, canceled, failed, rejected
+        return s == 'completed' ||
+            s == 'cancelled' ||
+            s == 'canceled' ||
+            s == 'failed' ||
+            s == 'rejected';
+      }
+    }).toList();
   }
 
   @override
@@ -126,47 +143,74 @@ class _BookingsScreenState extends State<BookingsScreen> {
   }
 
   Widget _buildBookingsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredBookings.length,
-      itemBuilder: (context, index) {
-        final booking = _filteredBookings[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _buildBookingCard(
-            crn: booking.bookingId ?? 'TX000000',
-            from: booking.pickupAddress,
-            to: booking.dropAddress,
-            date: booking.pickupDate,
-            time: booking.pickupTime,
-            status: booking.status ?? 'Pending',
-            cabType: booking.vehicleCategory,
-            price: '₹${booking.fare.toInt()}',
-            driverName: booking.driverName,
-            driverNumber: booking.driverNumber,
-            carNo: booking.carNo,
-          ),
-        );
-      },
+    return RefreshIndicator(
+      color: kAmberDeep,
+      onRefresh: _fetchBookings,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _filteredBookings.length,
+        itemBuilder: (context, index) {
+          final booking = _filteredBookings[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildBookingCard(
+              crn: booking.bookingId ?? 'TX000000',
+              from: booking.pickupAddress,
+              to: booking.dropAddress,
+              date: booking.pickupDate,
+              time: booking.pickupTime,
+              status: booking.status ?? 'Pending',
+              cabType: booking.vehicleCategory,
+              price: '₹${booking.fare.toInt()}',
+              driverName: booking.driverName,
+              driverNumber: booking.driverNumber,
+              carNo: booking.carNo,
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset('assets/images/empty_bookings.png', height: 240),
-          const SizedBox(height: 16),
-          Text(
-            "No active bookings found",
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: kInk,
+    return RefreshIndicator(
+      color: kAmberDeep,
+      onRefresh: _fetchBookings,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset('assets/images/empty_bookings.png', height: 240),
+                    const SizedBox(height: 16),
+                    Text(
+                      "No active bookings found",
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: kInk,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Pull down to refresh",
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: kInkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

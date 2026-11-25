@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package_booking_dialog.dart';
+import 'package:intl/intl.dart';
+// import 'package_booking_dialog.dart';
 import '../../../theme/app_theme.dart';
 
 class BannersSection extends StatelessWidget {
@@ -40,9 +41,27 @@ class BannersSection extends StatelessWidget {
     );
   }
 
+  static DateTime _getInitialStartTime() {
+    final now = DateTime.now();
+    // Outstation package tour: 1 hour after current time, rounded to next 15 mins
+    final minTime = now.add(const Duration(hours: 1));
+    final int remainder = minTime.minute % 15;
+    final int minutesToAdd = remainder == 0 ? 0 : (15 - remainder);
+    final rounded = minTime.add(Duration(minutes: minutesToAdd));
+    return DateTime(
+      rounded.year,
+      rounded.month,
+      rounded.day,
+      rounded.hour,
+      rounded.minute,
+    );
+  }
+
   Widget _buildBannerItem(BuildContext context, String title, String imageUrl) {
     return GestureDetector(
       onTap: () {
+        // Commented out PackageBookingDialog card for now; redirect directly to main search bar
+        /*
         showDialog(
           context: context,
           builder:
@@ -50,6 +69,21 @@ class BannersSection extends StatelessWidget {
                 packageName: title,
                 onExplore: onPackageSelected,
               ),
+        );
+        */
+        final isChardham =
+            title.toLowerCase().contains('chardham') ||
+            title.toLowerCase().contains('dham');
+        final startDt = _getInitialStartTime();
+        final endDt = startDt.add(Duration(days: isChardham ? 3 : 4));
+
+        onPackageSelected?.call(
+          fromCity: isChardham ? 'Haridwar' : 'Kolkata',
+          toCity: isChardham ? 'Yamunotri (1 DHAM)' : 'Goa Beach Circuit',
+          startDate: DateFormat('dd-MM-yyyy').format(startDt),
+          startTime: DateFormat('hh:mm a').format(startDt),
+          endDate: DateFormat('dd-MM-yyyy').format(endDt),
+          endTime: DateFormat('hh:mm a').format(endDt),
         );
       },
       child: Container(

@@ -4,8 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/booking_service.dart';
 import '../../data/services/payment_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/addon_service.dart';
 import '../../data/models/booking.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/booking_steps_bar.dart';
 import 'thank_you_screen.dart';
 import 'payment_pending_screen.dart';
 
@@ -75,20 +77,19 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   late TextEditingController _phoneController;
   String _displayDialCode = '+91';
 
-  // Add-on States
-  bool _includeExpressway = false;
-  bool _includeLanguage = false;
-  bool _includeLuggage = false;
-  bool _includeNewCar = false;
+  // Dynamic Add-on States (loaded from Admin /api/addons)
+  List<AddonItem> _addons = List<AddonItem>.from(AddonService.defaultAddons);
+  final Map<String, bool> _selectedAddons = {};
+  bool _isLoadingAddons = true;
   bool _includePet = false;
   int _petCount = 1;
 
-  // Add-on Prices
-  static const double priceExpressway = 293.0;
-  static const double priceLanguage = 199.0;
-  static const double priceLuggage = 149.0;
-  static const double priceNewCar = 249.0;
-  static const double pricePerPet = 1000.0;
+  double get _petAddonPrice {
+    for (final a in _addons) {
+      if (a.isPetAddon) return a.price;
+    }
+    return 1001.0;
+  }
 
   // Coupon & Price State
   late double _basePrice;
@@ -140,7 +141,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     if (widget.petType != null) {
       _includePet = true;
       _petCount = 1;
-      _basePrice = (rawPrice - pricePerPet).clamp(0.0, double.infinity);
+      _selectedAddons['petAllowance'] = true;
+      _basePrice = (rawPrice - _petAddonPrice).clamp(0.0, double.infinity);
     } else {
       _includePet = false;
       _petCount = 1;
@@ -148,6 +150,23 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
     }
 
     _loadUserData();
+    _loadAddons();
+  }
+
+  Future<void> _loadAddons() async {
+    final fetched = await AddonService.getAddons();
+    if (!mounted) return;
+    setState(() {
+      _addons = fetched;
+      _isLoadingAddons = false;
+      if (_includePet) {
+        for (final a in _addons) {
+          if (a.isPetAddon) {
+            _selectedAddons[a.key] = true;
+          }
+        }
+      }
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -263,11 +282,15 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
 
   double get _addonsTotal {
     double total = 0;
-    if (_includeExpressway) total += priceExpressway;
-    if (_includeLanguage) total += priceLanguage;
-    if (_includeLuggage) total += priceLuggage;
-    if (_includeNewCar) total += priceNewCar;
-    if (_includePet) total += (_petCount * pricePerPet);
+    for (final addon in _addons) {
+      if (addon.isPetAddon) {
+        if (_includePet) {
+          total += addon.price * _petCount;
+        }
+      } else if (_selectedAddons[addon.key] == true) {
+        total += addon.price;
+      }
+    }
     return total;
   }
 
@@ -390,12 +413,13 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       petCount: _petCount,
       source: 'BroomBoom App',
       addons: {
+        for (final addon in _addons)
+          addon.key:
+              addon.isPetAddon
+                  ? _includePet
+                  : (_selectedAddons[addon.key] == true),
         'petAllowance': _includePet,
         'petCount': _petCount,
-        'roofCarrier': _includeLuggage,
-        'newVehicle': _includeNewCar,
-        'language': _includeLanguage,
-        'expressway': _includeExpressway,
       },
       pickupLat: widget.fromLat?.toString(),
       pickupLng: widget.fromLng?.toString(),
@@ -614,6 +638,10 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
       ),
       body: Column(
         children: [
+          BookingStepsBar(
+            currentStep: 3,
+            onStep2Tap: () => Navigator.pop(context),
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1121,43 +1149,51 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
           const SizedBox(height: 8),
           Divider(color: kInputBorder.withValues(alpha: 0.6)),
           const SizedBox(height: 4),
-          _buildAddonItem(
-            '${widget.from} - ${widget.to} Expressway',
-            '₹ 293',
-            isSelected: _includeExpressway,
-            isPopular: true,
-            onChanged: (val) => setState(() => _includeExpressway = val!),
-          ),
-          _buildAddonItem(
-            'Chauffeurs who know your language',
-            '₹ 199',
-            isSelected: _includeLanguage,
-            onChanged: (val) => setState(() => _includeLanguage = val!),
-          ),
-          _buildAddonItem(
-            'Extra Luggage Carrier',
-            '₹ 149',
-            isSelected: _includeLuggage,
-            onChanged: (val) => setState(() => _includeLuggage = val!),
-          ),
-          _buildAddonItem(
-            'Guaranteed New Model Vehicle',
-            '₹ 249',
-            isSelected: _includeNewCar,
-            onChanged: (val) => setState(() => _includeNewCar = val!),
-          ),
-          _buildPetAddonItem(),
+          if (_isLoadingAddons)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: kAmberDeep,
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._addons.map((addon) {
+              if (addon.isPetAddon) {
+                return _buildPetAddonItem(addon);
+              }
+              final isSelected = _selectedAddons[addon.key] == true;
+              return _buildAddonItem(
+                addon.name,
+                '₹ ${addon.price.toInt()}',
+                description: addon.description,
+                isSelected: isSelected,
+                isPopular: addon.isPopular,
+                onChanged: (val) {
+                  setState(() {
+                    _selectedAddons[addon.key] = val ?? false;
+                  });
+                },
+              );
+            }),
         ],
       ),
     );
   }
 
-  Widget _buildPetAddonItem() {
+  Widget _buildPetAddonItem(AddonItem petAddon) {
     final String title =
         widget.petType != null && widget.petType!.isNotEmpty
-            ? 'Carrying Pet (${widget.petType})'
-            : 'Carrying Pet';
-    final int totalPetPrice = (_petCount * pricePerPet).toInt();
+            ? '${petAddon.name} (${widget.petType})'
+            : petAddon.name;
+    final double unitPrice = petAddon.price;
+    final int totalPetPrice = (_petCount * unitPrice).toInt();
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -1234,8 +1270,8 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                 ),
                 Text(
                   _includePet
-                      ? '₹ $totalPetPrice (₹ 1,000/pet)'
-                      : '₹ 1,000 per pet',
+                      ? '₹ $totalPetPrice (₹ ${unitPrice.toInt()}/pet)'
+                      : '₹ ${unitPrice.toInt()} per pet',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     color: kAmberDeep,
@@ -1304,6 +1340,7 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
   Widget _buildAddonItem(
     String title,
     String price, {
+    String description = '',
     required bool isSelected,
     bool isPopular = false,
     required ValueChanged<bool?> onChanged,
@@ -1374,6 +1411,16 @@ class _BookingReviewScreenState extends State<BookingReviewScreen> {
                     ],
                   ],
                 ),
+                if (description.isNotEmpty)
+                  Text(
+                    description,
+                    style: GoogleFonts.outfit(
+                      fontSize: 10.5,
+                      color: kInkSoft,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 Text(
                   price,
                   style: GoogleFonts.outfit(

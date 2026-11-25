@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../account/bookings_screen.dart';
 import '../home/home_screen.dart';
 import 'thank_you_screen.dart';
+import '../../widgets/booking_steps_bar.dart';
 
 class PaymentPendingScreen extends StatefulWidget {
   final Booking booking;
@@ -139,9 +140,25 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
     return Scaffold(
       backgroundColor: kBgMid,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
+        child: Column(
+          children: [
+            BookingStepsBar(
+              currentStep: 4,
+              onStep1Tap: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        HomeScreen(phoneNumber: widget.phoneNumber),
+                  ),
+                  (route) => false,
+                );
+              },
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const SizedBox(height: 16),
@@ -477,6 +494,9 @@ class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
               const SizedBox(height: 16),
             ],
           ),
+        ),
+            ),
+          ],
         ),
       ),
     );

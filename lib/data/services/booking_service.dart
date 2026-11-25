@@ -5,17 +5,64 @@ import '../models/booking.dart';
 import 'api_service.dart';
 
 class BookingService {
-  static Future<List<Booking>> getMyBookings() async {
+  static Future<List<Booking>> getMyBookings({String? mobile, String? email}) async {
     try {
-      final response = await ApiService.get('/bookings');
+      final prefs = await SharedPreferences.getInstance();
+      final phone = (mobile != null && mobile.trim().isNotEmpty)
+          ? mobile.trim()
+          : (prefs.getString('phone_number') ??
+              prefs.getString('user_phone') ??
+              prefs.getString('userPhone') ??
+              '');
+      final userEmail = (email != null && email.trim().isNotEmpty)
+          ? email.trim()
+          : (prefs.getString('user_email') ??
+              prefs.getString('userEmail') ??
+              '');
+
+      // Construct query parameters to support token auth, phone auth, and email auth
+      final queryParams = <String>[];
+      if (phone.isNotEmpty) {
+        queryParams.add('mobile=${Uri.encodeComponent(phone)}');
+      }
+      if (userEmail.isNotEmpty) {
+        queryParams.add('email=${Uri.encodeComponent(userEmail)}');
+      }
+      final path = queryParams.isEmpty ? '/bookings' : '/bookings?${queryParams.join('&')}';
+
+      final response = await ApiService.get(path);
       if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        return data.map((item) => Booking.fromJson(item)).toList();
+        final dynamic decoded = jsonDecode(response.body);
+        List<dynamic> rawList = [];
+        if (decoded is List) {
+          rawList = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          if (decoded['bookings'] is List) {
+            rawList = decoded['bookings'] as List;
+          } else if (decoded['data'] is List) {
+            rawList = decoded['data'] as List;
+          } else if (decoded['results'] is List) {
+            rawList = decoded['results'] as List;
+          }
+        }
+
+        final List<Booking> result = [];
+        for (final item in rawList) {
+          if (item is Map<String, dynamic>) {
+            try {
+              result.add(Booking.fromJson(item));
+            } catch (e) {
+              print('[BookingService] Failed to parse booking item: $e');
+            }
+          }
+        }
+        return result;
       } else {
-        throw Exception('Failed to load bookings');
+        print('[BookingService] /bookings returned status ${response.statusCode}: ${response.body}');
+        return [];
       }
     } catch (e) {
-      print('Error fetching bookings: $e');
+      print('[BookingService] Error fetching bookings: $e');
       return [];
     }
   }

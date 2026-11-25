@@ -338,6 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return AirportBookingCard(phoneNumber: widget.phoneNumber);
       default:
         return BookingCard(
+          key: ValueKey('booking_card_${_selectedNavIndex}_${_isOneWay}_${_prefilledFrom}_${_prefilledTo}_${_prefilledStartDate}'),
           isOneWay: _isOneWay,
           onToggle: (val) => setState(() => _isOneWay = val),
           phoneNumber: widget.phoneNumber,
