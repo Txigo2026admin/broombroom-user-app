@@ -15,7 +15,7 @@ class ApiService {
 
   /// Set to true only if testing against a locally running backend on port 5004.
   /// Defaults to false so the app seamlessly fetches live admin prices from the cloud backend.
-  static const bool useLocalBackend = true;
+  static const bool useLocalBackend = false;
 
   // API_URL can override the default when supplied at build time.
   static String get baseUrl {

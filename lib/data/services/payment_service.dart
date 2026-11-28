@@ -100,9 +100,7 @@ class PaymentService {
         }
       }
 
-      final Map<String, dynamic> payload = {
-        'bookingId': bookingId,
-      };
+      final Map<String, dynamic> payload = {'bookingId': bookingId};
       if (effectiveReturnUrl != null && effectiveReturnUrl.isNotEmpty) {
         payload['returnUrl'] = effectiveReturnUrl;
       }
@@ -123,7 +121,9 @@ class PaymentService {
       }
 
       if (kDebugMode) {
-        debugPrint('[PaymentService] API error ${response.statusCode}: ${response.body}');
+        debugPrint(
+          '[PaymentService] API error ${response.statusCode}: ${response.body}',
+        );
       }
 
       return PaymentOrderResult(
@@ -208,7 +208,7 @@ class PaymentService {
     String env = 'sandbox',
   }) async {
     try {
-      return await pg_helper.launchCashfree(paymentSessionId, env);
+      return await pg_helper.launchCashfree(paymentSessionId, env, '');
     } catch (e) {
       if (kDebugMode) {
         print('Error launching Cashfree: $e');

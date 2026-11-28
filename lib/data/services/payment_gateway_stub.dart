@@ -1,28 +1,14 @@
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 
-Future<String> launchCashfree(String paymentSessionId, String env) async {
-  final isProduction = env.toLowerCase() == 'production';
-  final checkoutUrl = isProduction
-      ? 'https://payments.cashfree.com/order/#$paymentSessionId'
-      : 'https://sandbox.cashfree.com/pg/orders/sessions/$paymentSessionId';
-
-  final uri = Uri.parse(checkoutUrl);
-  try {
-    if (await canLaunchUrl(uri)) {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (launched) {
-        return '{"status": "OPENED", "url": "$checkoutUrl"}';
-      }
-    }
-  } catch (e) {
-    return '{"error": "$e"}';
-  }
-  return '{"error": "Could not launch Cashfree checkout"}';
+Future<String> launchCashfree(
+  String orderId,
+  String paymentSessionId,
+  String env,
+) async {
+  return jsonEncode({
+    'status': 'UNSUPPORTED_PLATFORM',
+    'error': 'Cashfree checkout is not supported on this platform.',
+  });
 }
 
-void clearUrlQueryParams() {
-  // No-op on non-web platforms
-}
+void clearUrlQueryParams() {}
